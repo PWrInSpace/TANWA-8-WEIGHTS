@@ -118,4 +118,37 @@ menu "TANWA BOARD CONFIGURATION"
                 Acceptance mask for TWAI filter.
     endmenu
 
+    menu "SPI CONFIGURATION"
+
+        config SPI_MOSI
+            int "SPI MOSI GPIO"
+            default 11
+            help
+                GPIO number for SPI MOSI pin.
+        
+        config SPI_MISO
+            int "SPI MISO GPIO"
+            default 10
+            help
+                GPIO number for SPI MISO pin.
+        
+        config SPI_SCK
+            int "SPI SCK GPIO"
+            default 9
+            help
+                GPIO number for SPI SCK pin.
+        
+        config SPI_CS_A
+            int "SPI CS GPIO"
+            default 15
+            help
+                GPIO number for SPI CS1 pin.
+
+        config SPI_CS_2
+            int "SPI CS GPIO 2"
+            default 7
+            help
+                GPIO number for second SPI CS2 pin.
+    endmenu
+
 endmenu

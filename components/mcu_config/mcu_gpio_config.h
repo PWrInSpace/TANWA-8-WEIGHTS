@@ -22,12 +22,14 @@
 //ADD CONFIGURED GPIO PINS HERE
 typedef enum {
     LED_GPIO = CONFIG_GPIO_LED,
+    ADS1256_1_CS_GPIO = 7
 } mcu_gpio_cfg_t;
 
 // ADD GPIO PINS INDICES HERE
 typedef enum {
     LED_GPIO_INDEX = 0,
-    MAX_GPIO_INDEX
+    ADS1256_1_CS_GPIO_INDEX,
+    MAX_GPIO_INDEX = 2
 } mcu_gpio_index_cfg_t;
 
 typedef struct {
