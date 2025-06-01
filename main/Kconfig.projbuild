@@ -1,0 +1,121 @@
+menu "TANWA BOARD CONFIGURATION"
+
+    menu "TASK CONFIGURATION"
+
+        menu "SETUP TASK"
+
+            config SETUP_TASK_STACK_SIZE
+                int "Stack size"
+                default 4096
+                help
+                    Stack size for setup task.
+            
+            config SETUP_TASK_PRIORITY
+                int "Priority"
+                default 5
+                help
+                    Priority for setup task.
+
+            config SETUP_TASK_CORE_ID
+                int "Core ID"
+                default 0
+                help
+                    Core ID for setup task.
+            
+        endmenu
+
+        menu "CAN TASK"
+
+            config CAN_TASK_STACK_SIZE
+                int "Stack size"
+                default 4096
+                help
+                    Stack size for CAN task.
+            
+            config CAN_TASK_PRIORITY
+                int "Priority"
+                default 5
+                help
+                    Priority for CAN task.
+
+            config CAN_TASK_CORE_ID
+                int "Core ID"
+                default 0
+                help
+                    Core ID for CAN task.
+
+        endmenu
+
+        menu "APP TASK"
+
+            config APP_TASK_STACK_SIZE
+                int "Stack size"
+                default 4096
+                help
+                    Stack size for main task.
+            
+            config APP_TASK_PRIORITY
+                int "Priority"
+                default 5
+                help
+                    Priority for main task.
+
+            config APP_TASK_CORE_ID
+                int "Core ID"
+                default 0
+                help
+                    Core ID for main task.
+
+        endmenu
+    endmenu
+
+    menu "GPIO CONFIGURATION"
+
+        config GPIO_LED
+            int "LED GPIO"
+            default 46
+            help
+                GPIO number for LED.
+        
+    endmenu
+
+    menu "CAN CONFIGURATION"
+
+        config CAN_RX_GPIO
+            int "TWAI RX PIN"
+            default 21
+            help
+                GPIO number for TWAI RX pin.
+        
+        config CAN_TX_GPIO
+            int "CAN TX PIN"
+            default 22
+            help
+                GPIO number for TWAI TX pin.
+
+        config CAN_TX_QUEUE_LENGTH
+            int "TX Queue Length"
+            default 10
+            help
+                Length of the TX queue for CAN messages.
+
+        config CAN_RX_QUEUE_LENGTH
+            int "RX Queue Length"
+            default 10
+            help
+                Length of the RX queue for CAN messages.
+        
+        config TWAI_ACCEPTANCE_CODE
+            int "Acceptance Code"
+            default 0
+            help
+                Acceptance code for TWAI filter.
+        
+        config TWAI_ACCEPTANCE_MASK
+            int "Acceptance Mask"
+            default 2147483647
+            help
+                Acceptance mask for TWAI filter.
+    endmenu
+
+endmenu
