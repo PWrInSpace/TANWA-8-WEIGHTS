@@ -3,6 +3,103 @@
 #include "mcu_gpio_config.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
+
+#define TAG "ads1256"
+
+TaskHandle_t DRDY1_task = NULL;
+TaskHandle_t DRDY2_task = NULL;
+bool install_isr_service()
+{
+    esp_err_t res = gpio_install_isr_service(0);
+    if (res != ESP_OK && res != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE("ISR", "GPIO ISR service install failed!");
+        return false;
+    }
+    return true; 
+}
+bool rdy_gpio1_attach_isr(void (*handler)(void*), void* arg) {
+    esp_err_t res = gpio_isr_handler_add(DRDY_GPIO_1, handler, arg);
+    if (res != ESP_OK) {
+        ESP_LOGE("ISR", "Failed to attach ISR to DRDY_GPIO_1!");
+        return false;
+    }
+
+    ESP_LOGI("ISR", "ISR attached to DRDY_GPIO_1");
+    return true;
+}
+
+bool rdy_gpio2_attach_isr(void (*handler)(void*), void* arg) {
+    esp_err_t res = gpio_isr_handler_add(DRDY_GPIO_2, handler, arg);
+    if (res != ESP_OK) {
+        ESP_LOGE("ISR", "Failed to attach ISR to DRDY_GPIO_2!");
+        return false;
+    }
+
+    ESP_LOGI("ISR", "ISR attached to DRDY_GPIO_2");
+    return true;
+}
+
+void IRAM_ATTR gpio1_isr_handler(void* arg) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    if (DRDY1_task != NULL) {
+        xTaskNotifyFromISR(DRDY1_task, 0, eNoAction, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+void IRAM_ATTR gpio2_isr_handler(void* arg) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    if (DRDY2_task != NULL) {
+        xTaskNotifyFromISR(DRDY2_task, 0, eNoAction, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+bool setup_isr1() {
+    if(rdy_gpio1_attach_isr(gpio1_isr_handler, NULL))
+    {
+        ESP_LOGI(TAG, "GPIO ISR setup successful");
+        return true;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "GPIO ISR setup failed");
+        return false;
+    }
+}
+
+bool setup_isr2() {
+    if(rdy_gpio2_attach_isr(gpio2_isr_handler, NULL))
+    {
+        ESP_LOGI(TAG, "GPIO ISR setup successful");
+        return true;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "GPIO ISR setup failed");
+        return false;
+    }
+}
+
+void isr_rdy1_loop(void*  pvParameters)
+{
+    while (1)
+    {
+        //TODO: Implementacja handling ADS1256 data ready interrupt na RDY_GPIO_1
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+    }
+}
+
+void isr_rdy2_loop(void*  pvParameters)
+{
+    while (1)
+    {
+        //TODO: Implementacja handling ADS1256 data ready interrupt na RDY_GPIO_2
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+    }
+}
+
+
 bool ads1256_set_value(uint8_t register_address, uint8_t value)
 {
     const uint8_t WREG = 0x50;
@@ -55,7 +152,7 @@ bool ads1256_reset(void)
 
 bool ads1256_init(void)
 {
-    /*init lokalny gpio*/
+    /*init lokalny gpio output*/
     gpio_config_t io_conf = {
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
@@ -76,6 +173,24 @@ bool ads1256_init(void)
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_1, 1));  
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 1)); 
 
+    /*init lokalny gpio input*/
+
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+
+    gpio_num_t input_pins[] = {
+        DRDY_GPIO_1,
+        DRDY_GPIO_2
+    };
+
+    for (int i = 0; i < sizeof(input_pins)/sizeof(input_pins[0]); i++) {
+        io_conf.pin_bit_mask = 1ULL << input_pins[i];
+        gpio_config(&io_conf);
+    }
+
+    
 
     /*Debug problemu z ustawianiem pin lvl na outpucie*/
     if(gpio_get_level(CS_GPIO_1) == 1)
@@ -96,7 +211,24 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "GPIO %d is not set to HIGH (check configuration)", CS_GPIO_2);
         return false;
     }
-
+    if(install_isr_service() == false)
+    {
+        ESP_LOGE("ADS1256", "Failed to install ISR service");
+        return false;
+    }
+    if(setup_isr1() == false)
+    {
+        ESP_LOGE("ADS1256", "Failed to setup ISR for DRDY_GPIO_1");
+        return false;
+    }
+    if(setup_isr2() == false)
+    {
+        ESP_LOGE("ADS1256", "Failed to setup ISR for DRDY_GPIO_2");
+        return false;
+    }
+    
+    xTaskCreate(isr_rdy1_loop, "ad7190_task", 4096, NULL, 10, &DRDY1_task); 
+    xTaskCreate(isr_rdy2_loop, "ad7190_task", 4096, NULL, 10, &DRDY2_task);
 
     if(ads1256_reset())
     {

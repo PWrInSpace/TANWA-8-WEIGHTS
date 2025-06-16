@@ -16,7 +16,6 @@ uint8_t ads1256_id = 0;
 
 void app_main(void) {
     
-    // CONFIGURE THE MESSAGE
 
     ESP_LOGI(TAG, "%s TANWA board starting", config.board_name);
     
@@ -26,14 +25,14 @@ void app_main(void) {
     }
 
     while(1) {
-
+        ESP_LOGI(TAG, "DUPA");
         // gpio_set_level(15, 1); 
         // ESP_LOGI(TAG, "GPIO 15 set to HIGH - lvl: %d", gpio_get_level(15));
-        if(!ads1256_read_id(&ads1256_id)) {
-            ESP_LOGE(TAG, "Failed to read ADS1256 ID");
-        }
-        led_toggle(&(config.status_led));
-        ads1256_get_raw_data(&ads1256_data);
+        // if(!ads1256_read_id(&ads1256_id)) {
+        //     ESP_LOGE(TAG, "Failed to read ADS1256 ID");
+        // }
+        // led_toggle(&(config.status_led));
+        // ads1256_get_raw_data(&ads1256_data);
         // if(ads1256_get_raw_data(&ads1256_data)) {
         //     ESP_LOGI(TAG, "ADS1256 Data: %d %d %d", ads1256_data.channel_1[0], ads1256_data.channel_1[1], ads1256_data.channel_1[2]);
         // } else {

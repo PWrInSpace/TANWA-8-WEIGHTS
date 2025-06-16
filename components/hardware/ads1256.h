@@ -6,6 +6,8 @@
 
 #define CS_GPIO_1 15 //TODO: zabrac z configu GPIO
 #define CS_GPIO_2 7
+#define DRDY_GPIO_1 18
+#define DRDY_GPIO_2 35
 
 #define STATUS_REGISTER_DEFAULT 0x00
 #define MUX_REGISTER_FIRST_CHANNEL 0x01 // AIN0+ AIN1-
