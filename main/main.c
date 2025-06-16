@@ -29,9 +29,9 @@ void app_main(void) {
 
         // gpio_set_level(15, 1); 
         // ESP_LOGI(TAG, "GPIO 15 set to HIGH - lvl: %d", gpio_get_level(15));
-        // if(!ads1256_read_id(&ads1256_id)) {
-        //     ESP_LOGE(TAG, "Failed to read ADS1256 ID");
-        // }
+        if(!ads1256_read_id(&ads1256_id)) {
+            ESP_LOGE(TAG, "Failed to read ADS1256 ID");
+        }
         led_toggle(&(config.status_led));
         ads1256_get_raw_data(&ads1256_data);
         // if(ads1256_get_raw_data(&ads1256_data)) {
