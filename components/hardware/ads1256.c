@@ -99,56 +99,66 @@ void isr_rdy2_loop(void*  pvParameters)
     }
 }
 
-
-bool ads1256_set_value(uint8_t register_address, uint8_t value)
+void set_gpio_lvl(ads1256_device_t device, uint8_t level)
 {
-    const uint8_t WREG = 0x50;
-    gpio_set_direction(7, GPIO_MODE_OUTPUT);
-    uint8_t tx_data1[1] = {WREG | register_address};
-    if(!_ads1256_spi_transmit(tx_data1, sizeof(tx_data1), NULL, 0))
+    if(level==0)
     {
-        ESP_LOGE("ADS1256", "Failed to set value in ADS1256 register");
+        gpio_set_direction(device, GPIO_MODE_OUTPUT);
+    }
+    else if(level==1)
+    {
+        gpio_set_direction(device, GPIO_MODE_INPUT);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Invalid GPIO level specified. Use 0 for output and 1 for input.");
+        return;
+    }
+} 
+bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length)
+{
+    if (tx_data == NULL || tx_length == 0) {
+        ESP_LOGE(TAG, "Invalid transmit data or length");
         return false;
     }
-    uint8_t tx_data2[1] = {0x00}; 
-    _ads1256_spi_transmit(tx_data2, sizeof(tx_data2), NULL, 0);
-    uint8_t tx_data3[1] = {value}; 
-    _ads1256_spi_transmit(tx_data3, sizeof(tx_data3), NULL, 0);
-    esp_rom_delay_us(1);
-    gpio_set_direction(7, GPIO_MODE_INPUT);
-    return true;
-}
 
-bool ads1256_self_cal()
-{
-    const uint8_t SELFCAL_COMMAND = 0xF0;
-    gpio_set_direction(7, GPIO_MODE_OUTPUT);
-    if(!_ads1256_spi_transmit(&SELFCAL_COMMAND, sizeof(SELFCAL_COMMAND), NULL, 0))
-    {
-        ESP_LOGE("ADS1256", "Failed to perform self-calibration on ADS1256");
+    set_gpio_lvl(device, 0); 
+    if(!_ads1256_spi_transmit(tx_data, tx_length, NULL, 0)) {
+        ESP_LOGE(TAG, "Failed to transmit data to ADS1256");
         return false;
     }
-    esp_rom_delay_us(1);
-    gpio_set_direction(7, GPIO_MODE_INPUT);
-    ESP_LOGI("ADS1256", "ADS1256 self-calibration completed successfully");
+    esp_rom_delay_us(1); 
+    set_gpio_lvl(device, 1); 
+
     return true;
+
 }
-
-
-bool ads1256_reset(void)
+bool ads1256_set_value(uint8_t register_address, uint8_t value, ads1256_device_t device)
 {
-    const uint8_t RESET_COMMAND = 0xFE;
-    gpio_set_direction(7, GPIO_MODE_OUTPUT);
-    if(!_ads1256_spi_transmit(&RESET_COMMAND, sizeof(RESET_COMMAND), NULL, 0))
-    {
-        ESP_LOGE("ADS1256", "Failed to reset ADS1256");
-        return false;
-    }
-    vTaskDelay(pdMS_TO_TICKS(10));
-    gpio_set_direction(7, GPIO_MODE_INPUT);
-    ESP_LOGI("ADS1256", "ADS1256 reset successfully");
-    return true;
+    bool res = true;
+    uint8_t tx[3] = {WREG_COMMAND | register_address, 0x00, value};
+    res = res && ads1256_single_transmit(device, &tx[0], sizeof(tx));
+    res = res && ads1256_single_transmit(device, &tx[1], sizeof(tx));
+    res = res && ads1256_single_transmit(device, &tx[3], sizeof(tx));
+    return res;
 }
+
+bool ads1256_self_cal(ads1256_device_t device)
+{
+    const uint8_t tx = SELFCAL_COMMAND;
+    return ads1256_single_transmit(device, &tx, sizeof(tx));
+}
+
+
+bool ads1256_reset(ads1256_device_t device)
+{
+    const uint8_t tx = RESET_COMMAND;
+    bool result = ads1256_single_transmit(device, &tx, sizeof(tx));
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    return result;
+}
+
+
 
 bool ads1256_init(void)
 {
@@ -227,10 +237,10 @@ bool ads1256_init(void)
         return false;
     }
     
-    xTaskCreate(isr_rdy1_loop, "ad7190_task", 4096, NULL, 10, &DRDY1_task); 
-    xTaskCreate(isr_rdy2_loop, "ad7190_task", 4096, NULL, 10, &DRDY2_task);
+    // xTaskCreate(isr_rdy1_loop, "ad7190_task", 4096, NULL, 10, &DRDY1_task); //TODO: to nie powinno byc w init
+    // xTaskCreate(isr_rdy2_loop, "ad7190_task", 4096, NULL, 10, &DRDY2_task); //TODO: to nie powinno byc w init
 
-    if(ads1256_reset())
+    if(ads1256_reset(ADS1256_DEVICE_2))
     {
         ESP_LOGI("ADS1256", "ADS1256 reset successfully");
     }
@@ -239,7 +249,7 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to reset ADS1256");
         return false;
     }
-    if(ads1256_set_value(0x00, STATUS_REGISTER_DEFAULT))
+    if(ads1256_set_value(0x00, STATUS_REGISTER_DEFAULT, ADS1256_DEVICE_2))
     {
         ESP_LOGI("ADS1256", "ADS1256 status register set successfully");
     }
@@ -248,7 +258,7 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 status register");
         return false;
     }
-    if(ads1256_set_value(0x01, MUX_REGISTER_FIRST_CHANNEL))
+    if(ads1256_set_value(0x01, MUX_REGISTER_FIRST_CHANNEL, ADS1256_DEVICE_2))
     {
         ESP_LOGI("ADS1256", "ADS1256 MUX register set successfully");
     }
@@ -257,7 +267,7 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 MUX register");
         return false;
     }
-    if(ads1256_set_value(0x02, ADCON_REGISTER))
+    if(ads1256_set_value(0x02, ADCON_REGISTER, ADS1256_DEVICE_2))
     {
         ESP_LOGI("ADS1256", "ADS1256 ADCON register set successfully");
     }
@@ -267,7 +277,7 @@ bool ads1256_init(void)
         return false;
     }
 
-    if(ads1256_set_value(0x03, DATA_RATE_REGISTER_100SPS))
+    if(ads1256_set_value(0x03, DATA_RATE_REGISTER_100SPS, ADS1256_DEVICE_2))
     {
         ESP_LOGI("ADS1256", "ADS1256 data rate register set successfully");
     }
@@ -276,7 +286,7 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 data rate register");
         return false;
     }
-    if(ads1256_self_cal())
+    if(ads1256_self_cal(ADS1256_DEVICE_2))
     {
         ESP_LOGI("ADS1256", "ADS1256 self-calibration completed successfully");
     }
@@ -287,6 +297,7 @@ bool ads1256_init(void)
     }
     return true;
 }
+
 bool ads1256_get_raw_data(ads1256_raw_data_t* data)
 {
     uint8_t tx_data[1] = { RDATA_COMMAND};  // Komenda + dummy bajty
@@ -318,16 +329,8 @@ bool ads1256_get_raw_data(ads1256_raw_data_t* data)
     if (value & 0x800000) {
         value |= 0xFF000000; // sign-extend if negative
     }
-    ESP_LOGI("ADS1256", "Raw sign value: %d", value+4150);
-    ESP_LOGI("ADS1256", "Gramy: %f", (value+4150)/2.4f);
-    value += 800; // Adjusting the value based on the offset
-    float voltage = (value / 8388608.0f) * (5 / 64.0f); // Convert to voltage (assuming 5V reference and 24-bit resolution)
-        // ESP_LOGI("ADS1256", "Voltage: %f mV", voltage * 1000);
-    // weight = value - 15372803; 
-    // ESP_LOGI("ADS1256", "Weight: %f", weight);
-    //-3100 offset
-    //1kg -230
-    //scale = -230 - -3100 = 2870
+    ESP_LOGI("ADS1256", "Raw sign value: %d", value);
+
 
 
     return true;
@@ -359,8 +362,3 @@ bool ads1256_read_id(uint8_t* id)
     ESP_LOGI("ADS1256", "ADS1256 GAIN: %d", *id);
     return true;
 }
-
-
-//zero 15372803
-//gdy 1 kg 16374531
-//wspolczynnik = 1/(16374531 - 15372803) = 0.00006103515625
