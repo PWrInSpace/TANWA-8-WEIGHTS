@@ -8,6 +8,17 @@
 
 TaskHandle_t DRDY1_task = NULL;
 TaskHandle_t DRDY2_task = NULL;
+
+char* ads1256_device_to_string(ads1256_device_t device) {
+    switch (device) {
+        case ADS1256_DEVICE_1:
+            return "ADS1256_DEVICE_1";
+        case ADS1256_DEVICE_2:
+            return "ADS1256_DEVICE_2";
+        default:
+            return "UNKNOWN_DEVICE";
+    }
+}
 bool install_isr_service()
 {
     esp_err_t res = gpio_install_isr_service(0);
@@ -356,7 +367,7 @@ bool ads1256_read_id(ads1256_device_t device)
     }
     esp_rom_delay_us(1);
     gpio_set_level(device,1);
-    ESP_LOGI("ADS1256", "ADS1256 GAIN: %d", rx_data2[0] & 0x07);
+    ESP_LOGI("ADS1256", "GAIN: %d on %s", (rx_data2[0]), ads1256_device_to_string(device));
     return true;
 }
 

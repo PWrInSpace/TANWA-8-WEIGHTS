@@ -29,7 +29,9 @@ void app_main(void) {
         ESP_LOGI(TAG, "DUPA");
         // ads1256_read_id(ADS1256_DEVICE_1);
         // ads1256_read_id(ADS1256_DEVICE_2);
-        ads1256_read_id2();
+        // ads1256_read_id2();
+        ads1256_read_id(ADS1256_DEVICE_1);
+        ads1256_read_id(ADS1256_DEVICE_2);
         // gpio_set_level(15, 1); 
         // ESP_LOGI(TAG, "GPIO 15 set to HIGH - lvl: %d", gpio_get_level(15));
         // if(!ads1256_read_id(&ads1256_id)) {
