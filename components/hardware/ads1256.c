@@ -155,7 +155,11 @@ bool ads1256_reset(ads1256_device_t device)
 
     gpio_num_t output_pins[] = {
         CS_GPIO_1,
-        CS_GPIO_2
+        CS_GPIO_2,
+        RESET_GPIO_1,
+        RESET_GPIO_2,
+        PWDN_GPIO_1,
+        PWDN_GPIO_2
     };
 
     for (int i = 0; i < sizeof(output_pins)/sizeof(output_pins[0]); i++) {
@@ -165,6 +169,10 @@ bool ads1256_reset(ads1256_device_t device)
 
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_1, 1));  
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 1)); 
+    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_1, 1)); 
+    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 1)); 
+    ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_1, 1)); 
+    ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_2, 1)); 
 
     /*init lokalny gpio input*/
 
@@ -220,7 +228,7 @@ bool ads1256_reset(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to setup ISR for DRDY_GPIO_2");
         return false;
     }
-
+    ESP_LOGI("ADS1256", "ADS1256 GPIO pins initialized successfully");
     return true;
 }
 
@@ -340,7 +348,7 @@ bool ads1256_read_id(ads1256_device_t device)
     uint8_t txdata2[1] = {0x00}; // Dummy byte to read ID
     uint8_t rx_data2[1] = {0};
 
-    vTaskDelay(pdMS_TO_TICKS(10)); 
+    // vTaskDelay(pdMS_TO_TICKS(10)); 
     if(!_ads1256_spi_transmit(txdata2, sizeof(txdata2), rx_data2, sizeof(rx_data2)))
     {
         ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
@@ -357,7 +365,7 @@ bool ads1256_read_id2()
 {
     
     // gpio_set_direction(7, GPIO_MODE_OUTPUT);
-    gpio_set_level(7,0);
+    gpio_set_level(15,0);
     uint8_t tx_data1[2] = {0x12, 0x00};
     uint8_t rx_data1[2] = {0, 0};
     if(!_ads1256_spi_transmit(tx_data1, sizeof(tx_data1), rx_data1, sizeof(rx_data1)))
@@ -375,7 +383,9 @@ bool ads1256_read_id2()
         return false;
     }
     esp_rom_delay_us(1);
-    gpio_set_level(7,1);
+    gpio_set_level(15,1);
+    // gpio_set_direction(7, GPIO_MODE_INPUT);
+
 
     // *id = ;
     ESP_LOGI("ADS1256", "ADS1256 GAIN: %d",rx_data2[0]);

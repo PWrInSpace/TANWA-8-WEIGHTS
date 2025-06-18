@@ -23,6 +23,7 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to initialize setup task");
         return;
     }
+    // ads1256_read_id2();
 
     while(1) {
         ESP_LOGI(TAG, "DUPA");

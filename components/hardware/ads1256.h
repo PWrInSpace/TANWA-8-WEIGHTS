@@ -6,6 +6,10 @@
 
 #define CS_GPIO_1 15 //TODO: zabrac z configu GPIO
 #define CS_GPIO_2 7
+#define RESET_GPIO_1 17
+#define RESET_GPIO_2 36
+#define PWDN_GPIO_1 16
+#define PWDN_GPIO_2 37
 #define DRDY_GPIO_1 18
 #define DRDY_GPIO_2 35
 
