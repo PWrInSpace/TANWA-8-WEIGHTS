@@ -99,22 +99,6 @@ void isr_rdy2_loop(void*  pvParameters)
     }
 }
 
-void set_gpio_lvl(ads1256_device_t device, uint8_t level)
-{
-    if(level==0)
-    {
-        gpio_set_direction(device, GPIO_MODE_OUTPUT);
-    }
-    else if(level==1)
-    {
-        gpio_set_direction(device, GPIO_MODE_INPUT);
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Invalid GPIO level specified. Use 0 for output and 1 for input.");
-        return;
-    }
-} 
 bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length)
 {
     if (tx_data == NULL || tx_length == 0) {
@@ -122,13 +106,13 @@ bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, si
         return false;
     }
 
-    set_gpio_lvl(device, 0); 
+    gpio_set_level(device,0);
     if(!_ads1256_spi_transmit(tx_data, tx_length, NULL, 0)) {
         ESP_LOGE(TAG, "Failed to transmit data to ADS1256");
         return false;
     }
     esp_rom_delay_us(1); 
-    set_gpio_lvl(device, 1); 
+    gpio_set_level(device,1);
 
     return true;
 
@@ -159,9 +143,8 @@ bool ads1256_reset(ads1256_device_t device)
 }
 
 
-
-bool ads1256_init(void)
-{
+ bool ads1256_pins_init(void)
+ {
     /*init lokalny gpio output*/
     gpio_config_t io_conf = {
         .mode = GPIO_MODE_OUTPUT,
@@ -203,24 +186,25 @@ bool ads1256_init(void)
     
 
     /*Debug problemu z ustawianiem pin lvl na outpucie*/
-    if(gpio_get_level(CS_GPIO_1) == 1)
-    {
-        ESP_LOGI("ADS1256", "GPIO %d is set to HIGH (correctly configured)", CS_GPIO_1);
-    }
-    else
-    {
-        ESP_LOGE("ADS1256", "GPIO %d is not set to HIGH (check configuration)", CS_GPIO_1);
-        return false;
-    }
-    if(gpio_get_level(CS_GPIO_2) == 1)
-    {
-        ESP_LOGI("ADS1256", "GPIO %d is set to HIGH (correctly configured)", CS_GPIO_2);
-    }
-    else
-    {
-        ESP_LOGE("ADS1256", "GPIO %d is not set to HIGH (check configuration)", CS_GPIO_2);
-        return false;
-    }
+    // if(gpio_get_level(CS_GPIO_1) == 1)
+    // {
+    //     ESP_LOGI("ADS1256", "GPIO %d is set to HIGH (correctly configured)", CS_GPIO_1);
+    // }
+    // else
+    // {
+    //     ESP_LOGE("ADS1256", "GPIO %d is not set to HIGH (check configuration)", CS_GPIO_1);
+    //     // return false;
+    // }
+
+    // if(gpio_get_level(CS_GPIO_2) == 1)
+    // {
+    //     ESP_LOGI("ADS1256", "GPIO %d is set to HIGH (correctly configured)", CS_GPIO_2);
+    // }
+    // else
+    // {
+    //     ESP_LOGE("ADS1256", "GPIO %d is not set to HIGH (check configuration)", CS_GPIO_2);
+    //     // return false;
+    // }
     if(install_isr_service() == false)
     {
         ESP_LOGE("ADS1256", "Failed to install ISR service");
@@ -236,11 +220,16 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to setup ISR for DRDY_GPIO_2");
         return false;
     }
-    
+
+    return true;
+}
+
+bool ads1256_init(ads1256_device_t device)
+{    
     // xTaskCreate(isr_rdy1_loop, "ad7190_task", 4096, NULL, 10, &DRDY1_task); //TODO: to nie powinno byc w init
     // xTaskCreate(isr_rdy2_loop, "ad7190_task", 4096, NULL, 10, &DRDY2_task); //TODO: to nie powinno byc w init
 
-    if(ads1256_reset(ADS1256_DEVICE_2))
+    if(ads1256_reset(device))
     {
         ESP_LOGI("ADS1256", "ADS1256 reset successfully");
     }
@@ -249,7 +238,7 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to reset ADS1256");
         return false;
     }
-    if(ads1256_set_value(0x00, STATUS_REGISTER_DEFAULT, ADS1256_DEVICE_2))
+    if(ads1256_set_value(0x00, STATUS_REGISTER_DEFAULT, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 status register set successfully");
     }
@@ -258,7 +247,7 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 status register");
         return false;
     }
-    if(ads1256_set_value(0x01, MUX_REGISTER_FIRST_CHANNEL, ADS1256_DEVICE_2))
+    if(ads1256_set_value(0x01, MUX_REGISTER_FIRST_CHANNEL, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 MUX register set successfully");
     }
@@ -267,7 +256,7 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 MUX register");
         return false;
     }
-    if(ads1256_set_value(0x02, ADCON_REGISTER, ADS1256_DEVICE_2))
+    if(ads1256_set_value(0x02, ADCON_REGISTER, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 ADCON register set successfully");
     }
@@ -277,7 +266,7 @@ bool ads1256_init(void)
         return false;
     }
 
-    if(ads1256_set_value(0x03, DATA_RATE_REGISTER_100SPS, ADS1256_DEVICE_2))
+    if(ads1256_set_value(0x03, DATA_RATE_REGISTER_100SPS, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 data rate register set successfully");
     }
@@ -286,7 +275,7 @@ bool ads1256_init(void)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 data rate register");
         return false;
     }
-    if(ads1256_self_cal(ADS1256_DEVICE_2))
+    if(ads1256_self_cal(device))
     {
         ESP_LOGI("ADS1256", "ADS1256 self-calibration completed successfully");
     }
@@ -336,12 +325,13 @@ bool ads1256_get_raw_data(ads1256_raw_data_t* data)
     return true;
 }
 
-bool ads1256_read_id(uint8_t* id)
+bool ads1256_read_id(ads1256_device_t device)
 {
-    gpio_set_direction(7, GPIO_MODE_OUTPUT);
+    gpio_set_level(device,0);
+
     uint8_t tx_data1[2] = {0x12, 0x00};
-    uint8_t rx_data1[2] = {0};
-    if(!_ads1256_spi_transmit(tx_data1, sizeof(tx_data1), rx_data1, sizeof(rx_data1)))
+    // uint8_t rx_data1[2] = {0, 0};
+    if(!_ads1256_spi_transmit(tx_data1, sizeof(tx_data1), NULL, 0))
     {
         ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
         return false;
@@ -357,8 +347,37 @@ bool ads1256_read_id(uint8_t* id)
         return false;
     }
     esp_rom_delay_us(1);
-    gpio_set_direction(7, GPIO_MODE_INPUT);
-    *id = rx_data2[0];
-    ESP_LOGI("ADS1256", "ADS1256 GAIN: %d", *id);
+    gpio_set_level(device,1);
+    ESP_LOGI("ADS1256", "ADS1256 GAIN: %d", rx_data2[0] & 0x07);
+    return true;
+}
+
+
+bool ads1256_read_id2()
+{
+    
+    // gpio_set_direction(7, GPIO_MODE_OUTPUT);
+    gpio_set_level(7,0);
+    uint8_t tx_data1[2] = {0x12, 0x00};
+    uint8_t rx_data1[2] = {0, 0};
+    if(!_ads1256_spi_transmit(tx_data1, sizeof(tx_data1), rx_data1, sizeof(rx_data1)))
+    {
+        ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
+        return false;
+    }
+    esp_rom_delay_us(7);
+    uint8_t txdata2[1] = {0x00}; // Dummy byte to read ID
+    uint8_t rx_data2[1] = {0};
+    // vTaskDelay(pdMS_TO_TICKS(10)); 
+    if(!_ads1256_spi_transmit(txdata2, sizeof(txdata2), rx_data2, sizeof(rx_data2)))
+    {
+        ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
+        return false;
+    }
+    esp_rom_delay_us(1);
+    gpio_set_level(7,1);
+
+    // *id = ;
+    ESP_LOGI("ADS1256", "ADS1256 GAIN: %d",rx_data2[0]);
     return true;
 }

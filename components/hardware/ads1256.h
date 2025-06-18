@@ -76,10 +76,12 @@ typedef struct ads1256_raw_data_t
 }ads1256_raw_data_t;
 
 
-bool ads1256_init(void);
+bool ads1256_init(ads1256_device_t device);
 
 bool ads1256_get_raw_data(ads1256_raw_data_t* data);
 
-bool ads1256_read_id(uint8_t* id);
+bool ads1256_read_id(ads1256_device_t device);
 
+bool ads1256_pins_init(void);
+bool ads1256_read_id2();
 #endif
