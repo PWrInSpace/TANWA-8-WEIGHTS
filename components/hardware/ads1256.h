@@ -47,6 +47,7 @@
 #define SELFGCAL_COMMAND 0xF2 // Self-gain calibration
 #define SYSOCAL_COMMAND 0xF3 // System offset calibration
 #define SYSGCAL_COMMAND 0xF4 // System gain calibration
+#define SYNC_COMMAND 0xFC // Synchronize
 #define RESET_COMMAND 0xFE // Reset
 #define STANDBY_COMMAND 0xFD // Standby
 
@@ -82,10 +83,10 @@ typedef struct ads1256_raw_data_t
 
 bool ads1256_init(ads1256_device_t device);
 
-bool ads1256_get_raw_data(ads1256_raw_data_t* data);
+bool ads1256_get_raw_data(ads1256_device_t device, ads1256_raw_data_t* data);
 
 bool ads1256_read_id(ads1256_device_t device);
-
+bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_pins_init(void);
-bool ads1256_read_id2();
+bool start_channel_task_ads2();
 #endif

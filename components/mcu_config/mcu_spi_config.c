@@ -71,12 +71,10 @@ bool _ads1256_spi_transmit(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_da
   // _mcu_gpio_set_level(ADS1256_1_CS_GPIO_INDEX, 0);
   // ESP_LOGI("DEBUG", "Pin lvl %d and expected: 1", gpio_get_level(15));
 
-  // gpio_set_direction(15, GPIO_MODE_OUTPUT);
   // ESP_LOGI("DEBUG", "Pin lvl %d and expected: 0", gpio_get_level(15));
   esp_err_t res = spi_device_transmit(spi_config.spi_ads1256_handle, &t);
   // esp_rom_delay_us(10);
   // _mcu_gpio_set_level(ADS1256_1_CS_GPIO_INDEX, 1);
-  // gpio_set_direction(15, GPIO_MODE_INPUT);
   // ESP_LOGI("DEBUG", "Pin lvl %d and expected: 1", gpio_get_level(15));
 
   xSemaphoreGive(mutex_spi);

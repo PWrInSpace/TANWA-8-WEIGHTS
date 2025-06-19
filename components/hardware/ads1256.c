@@ -19,6 +19,7 @@ char* ads1256_device_to_string(ads1256_device_t device) {
             return "UNKNOWN_DEVICE";
     }
 }
+
 bool install_isr_service()
 {
     esp_err_t res = gpio_install_isr_service(0);
@@ -28,6 +29,7 @@ bool install_isr_service()
     }
     return true; 
 }
+
 bool rdy_gpio1_attach_isr(void (*handler)(void*), void* arg) {
     esp_err_t res = gpio_isr_handler_add(DRDY_GPIO_1, handler, arg);
     if (res != ESP_OK) {
@@ -92,23 +94,23 @@ bool setup_isr2() {
     }
 }
 
-void isr_rdy1_loop(void*  pvParameters)
-{
-    while (1)
-    {
-        //TODO: Implementacja handling ADS1256 data ready interrupt na RDY_GPIO_1
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
-    }
-}
+// void isr_rdy1_loop(void*  pvParameters)
+// {
+//     while (1)
+//     {
+//         //TODO: Implementacja handling ADS1256 data ready interrupt na RDY_GPIO_1
+//         ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+//     }
+// }
 
-void isr_rdy2_loop(void*  pvParameters)
-{
-    while (1)
-    {
-        //TODO: Implementacja handling ADS1256 data ready interrupt na RDY_GPIO_2
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
-    }
-}
+// void isr_rdy2_loop(void*  pvParameters)
+// {
+//     while (1)
+//     {
+//         //TODO: Implementacja handling ADS1256 data ready interrupt na RDY_GPIO_2
+//         ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+//     }
+// }
 
 bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length)
 {
@@ -117,40 +119,80 @@ bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, si
         return false;
     }
 
-    gpio_set_level(device,0);
     if(!_ads1256_spi_transmit(tx_data, tx_length, NULL, 0)) {
         ESP_LOGE(TAG, "Failed to transmit data to ADS1256");
         return false;
     }
-    esp_rom_delay_us(1); 
-    gpio_set_level(device,1);
-
     return true;
 
 }
 bool ads1256_set_value(uint8_t register_address, uint8_t value, ads1256_device_t device)
 {
     bool res = true;
+    gpio_set_level(device,0);
     uint8_t tx[3] = {WREG_COMMAND | register_address, 0x00, value};
     res = res && ads1256_single_transmit(device, &tx[0], sizeof(tx));
     res = res && ads1256_single_transmit(device, &tx[1], sizeof(tx));
     res = res && ads1256_single_transmit(device, &tx[3], sizeof(tx));
+    esp_rom_delay_us(2); 
+    gpio_set_level(device,1);
+
     return res;
 }
 
 bool ads1256_self_cal(ads1256_device_t device)
 {
     const uint8_t tx = SELFCAL_COMMAND;
-    return ads1256_single_transmit(device, &tx, sizeof(tx));
+    gpio_set_level(device,0);
+    bool res = ads1256_single_transmit(device, &tx, sizeof(tx));
+    esp_rom_delay_us(2);
+    gpio_set_level(device,1);
+
+    return res;
 }
 
 
 bool ads1256_reset(ads1256_device_t device)
 {
     const uint8_t tx = RESET_COMMAND;
+    gpio_set_level(device,0);
     bool result = ads1256_single_transmit(device, &tx, sizeof(tx));
-    vTaskDelay(pdMS_TO_TICKS(10)); 
+    vTaskDelay(pdMS_TO_TICKS(1)); 
+    gpio_set_level(device,1);
     return result;
+}
+
+bool ads1256_wake_up(ads1256_device_t device)
+{
+    const uint8_t tx = WAKEUP_COMMAND;
+    gpio_set_level(device, 0); 
+    bool result = ads1256_single_transmit(device, &tx, sizeof(tx));
+    esp_rom_delay_us(2);
+    gpio_set_level(device, 1);
+    return result;
+}
+
+bool ads1256_sync(ads1256_device_t device)
+{
+    const uint8_t tx = SYNC_COMMAND;
+    gpio_set_level(device, 0);
+    bool result = ads1256_single_transmit(device, &tx, sizeof(tx));
+    esp_rom_delay_us(4);
+    gpio_set_level(device, 1);
+    return result;
+}
+
+bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
+{
+    if (channel != MUX_REGISTER_FIRST_CHANNEL && channel != MUX_REGISTER_SECOND_CHANNEL && channel != MUX_REGISTER_THIRD_CHANNEL && channel != MUX_REGISTER_FOURTH_CHANNEL) {
+        ESP_LOGE(TAG, "Invalid channel: %d", channel);
+        return false;
+    }
+
+    bool result = ads1256_set_value(0x01, channel, device);
+    return result;
+
+
 }
 
 
@@ -202,28 +244,6 @@ bool ads1256_reset(ads1256_device_t device)
         gpio_config(&io_conf);
     }
 
-    
-
-    /*Debug problemu z ustawianiem pin lvl na outpucie*/
-    // if(gpio_get_level(CS_GPIO_1) == 1)
-    // {
-    //     ESP_LOGI("ADS1256", "GPIO %d is set to HIGH (correctly configured)", CS_GPIO_1);
-    // }
-    // else
-    // {
-    //     ESP_LOGE("ADS1256", "GPIO %d is not set to HIGH (check configuration)", CS_GPIO_1);
-    //     // return false;
-    // }
-
-    // if(gpio_get_level(CS_GPIO_2) == 1)
-    // {
-    //     ESP_LOGI("ADS1256", "GPIO %d is set to HIGH (correctly configured)", CS_GPIO_2);
-    // }
-    // else
-    // {
-    //     ESP_LOGE("ADS1256", "GPIO %d is not set to HIGH (check configuration)", CS_GPIO_2);
-    //     // return false;
-    // }
     if(install_isr_service() == false)
     {
         ESP_LOGE("ADS1256", "Failed to install ISR service");
@@ -245,8 +265,6 @@ bool ads1256_reset(ads1256_device_t device)
 
 bool ads1256_init(ads1256_device_t device)
 {    
-    // xTaskCreate(isr_rdy1_loop, "ad7190_task", 4096, NULL, 10, &DRDY1_task); //TODO: to nie powinno byc w init
-    // xTaskCreate(isr_rdy2_loop, "ad7190_task", 4096, NULL, 10, &DRDY2_task); //TODO: to nie powinno byc w init
 
     if(ads1256_reset(device))
     {
@@ -306,38 +324,33 @@ bool ads1256_init(ads1256_device_t device)
     return true;
 }
 
-bool ads1256_get_raw_data(ads1256_raw_data_t* data)
+bool ads1256_get_raw_data(ads1256_device_t device, ads1256_raw_data_t* data)
 {
-    uint8_t tx_data[1] = { RDATA_COMMAND};  // Komenda + dummy bajty
-    uint8_t rx_data[1] = {0};  // Odbierzemy również 4 bajty
-    gpio_set_direction(7, GPIO_MODE_OUTPUT);
+    uint8_t tx_data = RDATA_COMMAND; 
+    uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
+    gpio_set_level(device,0);
     
-    if(!_ads1256_spi_transmit(tx_data, sizeof(tx_data), rx_data, sizeof(rx_data)))
+    if(ads1256_single_transmit(device, &tx_data, sizeof(tx_data)) == false)
+    {
+        ESP_LOGE("ADS1256", "Failed to send RDATA command to ADS1256");
+        return false;
+    }
+
+    esp_rom_delay_us(7); 
+
+    if(!_ads1256_spi_transmit(dummy_data, sizeof(dummy_data), data->channel_1, sizeof(data->channel_1)))
     {
         ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
         return false;
     }
-    esp_rom_delay_us(7);
 
-    uint8_t tx_data2[3] = {0x00, 0x00, 0x00}; // Dummy bytes to read data
-    uint8_t rx_data2[3] = {0};
-    if(!_ads1256_spi_transmit(tx_data2, sizeof(tx_data2), rx_data2, sizeof(rx_data2)))
-    {
-        ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
-        return false;
-    }
-    esp_rom_delay_us(1);
-
-    gpio_set_direction(7, GPIO_MODE_INPUT);
+    gpio_set_level(device,1);
     
-    data->channel_1[0] = rx_data2[0];
-    data->channel_1[1] = rx_data2[1];
-    data->channel_1[2] = rx_data2[2];
-    int32_t value = (rx_data2[0] << 16) | (rx_data2[1] << 8) | rx_data2[2];
+    int32_t value = (data->channel_1[0] << 16) | (data->channel_1[1] << 8) | data->channel_1[2];
     if (value & 0x800000) {
         value |= 0xFF000000; // sign-extend if negative
     }
-    ESP_LOGI("ADS1256", "Raw sign value: %d", value);
+        ESP_LOGI("ADS1256", "Raw sign value: %d", value);
 
 
 
@@ -346,6 +359,7 @@ bool ads1256_get_raw_data(ads1256_raw_data_t* data)
 
 bool ads1256_read_id(ads1256_device_t device)
 {
+    //debug func
     gpio_set_level(device,0);
 
     uint8_t tx_data1[2] = {0x12, 0x00};
@@ -355,50 +369,59 @@ bool ads1256_read_id(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
         return false;
     }
-    esp_rom_delay_us(7);
-    uint8_t txdata2[1] = {0x00}; // Dummy byte to read ID
-    uint8_t rx_data2[1] = {0};
+    vTaskDelay(pdMS_TO_TICKS(1)); 
 
-    // vTaskDelay(pdMS_TO_TICKS(10)); 
+    uint8_t txdata2[1] = {0x00}; 
+    uint8_t rx_data2[1] = {0};
     if(!_ads1256_spi_transmit(txdata2, sizeof(txdata2), rx_data2, sizeof(rx_data2)))
     {
         ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
         return false;
     }
-    esp_rom_delay_us(1);
+    vTaskDelay(pdMS_TO_TICKS(1)); 
     gpio_set_level(device,1);
     ESP_LOGI("ADS1256", "GAIN: %d on %s", (rx_data2[0]), ads1256_device_to_string(device));
     return true;
 }
 
 
-bool ads1256_read_id2()
+
+
+void ads1256_data_from_channels(void*  pvParameters)
 {
+    vTaskDelay(pdMS_TO_TICKS(1000)); 
+
+    //TODO: tylko device 2 tu jest, trzeba poprawic na oba i dodac data do miejsca jakiegos
+    ads1256_device_t device =  ADS1256_DEVICE_2;
+    ads1256_raw_data_t data;
+
+    while (1)
+    {
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ads1256_change_channel(device, MUX_REGISTER_FIRST_CHANNEL);
+        ads1256_sync(device);
+        ads1256_wake_up(device);
+        ads1256_get_raw_data(device, &data);
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ads1256_change_channel(device, MUX_REGISTER_SECOND_CHANNEL);
+        ads1256_sync(device);
+        ads1256_wake_up(device);
+        ads1256_get_raw_data(device, &data);
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+        ads1256_change_channel(device, MUX_REGISTER_THIRD_CHANNEL);
+        ads1256_sync(device);
+        ads1256_wake_up(device);
+        ads1256_get_raw_data(device, &data);
+
+    }
     
-    // gpio_set_direction(7, GPIO_MODE_OUTPUT);
-    gpio_set_level(15,0);
-    uint8_t tx_data1[2] = {0x12, 0x00};
-    uint8_t rx_data1[2] = {0, 0};
-    if(!_ads1256_spi_transmit(tx_data1, sizeof(tx_data1), rx_data1, sizeof(rx_data1)))
-    {
-        ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
-        return false;
-    }
-    esp_rom_delay_us(7);
-    uint8_t txdata2[1] = {0x00}; // Dummy byte to read ID
-    uint8_t rx_data2[1] = {0};
-    // vTaskDelay(pdMS_TO_TICKS(10)); 
-    if(!_ads1256_spi_transmit(txdata2, sizeof(txdata2), rx_data2, sizeof(rx_data2)))
-    {
-        ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
-        return false;
-    }
-    esp_rom_delay_us(1);
-    gpio_set_level(15,1);
-    // gpio_set_direction(7, GPIO_MODE_INPUT);
+}
 
-
-    // *id = ;
-    ESP_LOGI("ADS1256", "ADS1256 GAIN: %d",rx_data2[0]);
+bool start_channel_task_ads2()
+{
+    xTaskCreate(ads1256_data_from_channels, "ads1256_task", 4096, NULL, 10, &DRDY2_task);
     return true;
 }
