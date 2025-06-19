@@ -8,6 +8,7 @@
 
 TaskHandle_t DRDY1_task = NULL;
 TaskHandle_t DRDY2_task = NULL;
+static ads1256_device_t device_copy;
 
 char* ads1256_device_to_string(ads1256_device_t device) {
     switch (device) {
@@ -303,7 +304,7 @@ bool ads1256_init(ads1256_device_t device)
         return false;
     }
 
-    if(ads1256_set_value(0x03, DATA_RATE_REGISTER_100SPS, device))
+    if(ads1256_set_value(0x03, DATA_RATE_REGISTER_7500SPS, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 data rate register set successfully");
     }
@@ -363,7 +364,6 @@ bool ads1256_read_id(ads1256_device_t device)
     gpio_set_level(device,0);
 
     uint8_t tx_data1[2] = {0x12, 0x00};
-    // uint8_t rx_data1[2] = {0, 0};
     if(!_ads1256_spi_transmit(tx_data1, sizeof(tx_data1), NULL, 0))
     {
         ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
@@ -384,15 +384,78 @@ bool ads1256_read_id(ads1256_device_t device)
     return true;
 }
 
+void ads1256_read_data_continuously(void*  pvParameters)
+{
+    ads1256_device_t device = *((ads1256_device_t*) pvParameters);
+    ads1256_raw_data_t data;
+    uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
+    int32_t value = 0;
 
+    /* counting average of measurments */
+    // int64_t sum = 0;
+    // uint16_t counter = 0;
+    /* counting average of measurments */
+
+    
+    while (1)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        gpio_set_level(device, 0);
+        if(!_ads1256_spi_transmit(dummy_data, sizeof(dummy_data), data.channel_1, sizeof(data.channel_1)))
+        {
+            ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
+        }
+        gpio_set_level(device, 1);
+
+        value = (data.channel_1[0] << 16) | (data.channel_1[1] << 8) | data.channel_1[2];
+        if (value & 0x800000) {
+            value |= 0xFF000000;
+        }
+        ESP_LOGI("ADS1256", "Raw sign value: %d on %s", value, ads1256_device_to_string(device));
+
+        /* counting average of measurments */
+        // counter ++;
+        // sum += value;
+        // ESP_LOGI("ADS1256", "Average value after %d reads: %lld on %s", counter, sum / counter, ads1256_device_to_string(device));
+        /* counting average of measurments */
+
+
+    }
+}
+
+void ads1256_start_readc(ads1256_device_t device)
+{
+    vTaskDelay(pdMS_TO_TICKS(1000)); 
+
+    device_copy = device;
+    uint8_t tx_data = RDATAC_COMMAND;
+
+    gpio_set_level(device, 0); 
+    if(ads1256_single_transmit(device, &tx_data, sizeof(tx_data)) == false)
+    {
+        ESP_LOGE("ADS1256", "Failed to start continuous read on ADS1256");
+    }
+    else
+    {
+        ESP_LOGI("ADS1256", "Continuous read started on %s", ads1256_device_to_string(device));
+    }
+
+    esp_rom_delay_us(7);
+    gpio_set_level(device, 1); 
+
+
+    xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 4096, (void*)&device_copy, 10, &DRDY2_task);
+
+
+}
 
 
 void ads1256_data_from_channels(void*  pvParameters)
 {
     vTaskDelay(pdMS_TO_TICKS(1000)); 
 
-    //TODO: tylko device 2 tu jest, trzeba poprawic na oba i dodac data do miejsca jakiegos
-    ads1256_device_t device =  ADS1256_DEVICE_2;
+    ads1256_device_t device = *((ads1256_device_t*) pvParameters);
     ads1256_raw_data_t data;
 
     while (1)
@@ -420,8 +483,9 @@ void ads1256_data_from_channels(void*  pvParameters)
     
 }
 
-bool start_channel_task_ads2()
+
+void ads1256_start_channel_task(ads1256_device_t device)
 {
-    xTaskCreate(ads1256_data_from_channels, "ads1256_task", 4096, NULL, 10, &DRDY2_task);
-    return true;
+    device_copy = device;
+    xTaskCreate(ads1256_data_from_channels, "ads1256_task", 4096, (void*)&device_copy, 10, &DRDY2_task);
 }

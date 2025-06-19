@@ -22,6 +22,7 @@
 
 #define ADCON_REGISTER 0x06 // Gain = 64 (max output ~ 10mV) clck off debug off
 
+#define DATA_RATE_REGISTER_2P5SPS 0x03 // 2.5SPS
 #define DATA_RATE_REGISTER_5SPS 0x13 // 5SPS (samples per second)
 #define DATA_RATE_REGISTER_10SPS 0x23 // 10SPS 
 #define DATA_RATE_REGISTER_25SPS 0x43 // 25SPS 
@@ -88,5 +89,6 @@ bool ads1256_get_raw_data(ads1256_device_t device, ads1256_raw_data_t* data);
 bool ads1256_read_id(ads1256_device_t device);
 bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_pins_init(void);
-bool start_channel_task_ads2();
+void ads1256_start_channel_task(ads1256_device_t device);
+void ads1256_start_readc(ads1256_device_t device);
 #endif
