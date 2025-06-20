@@ -57,7 +57,7 @@ esp_err_t setup_task_init(void) {
     }
     ads1256_pins_init();
     ads1256_init(ADS1256_DEVICE_1);
-    ads1256_init(ADS1256_DEVICE_2);
+    // ads1256_init(ADS1256_DEVICE_2);
     // Create the setup task
     if(xTaskCreatePinnedToCore(setup_task, "setup_task", SETUP_TASK_STACK_SIZE, NULL, SETUP_TASK_PRIORITY, &setup_task_handle, SETUP_TASK_CORE_ID) == pdPASS) {
         ESP_LOGI(TAG, "Setup task created successfully");

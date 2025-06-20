@@ -21,6 +21,6 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to initialize setup task");
         return;
     }
-    ads1256_start_readc(ADS1256_DEVICE_2);
-    // ads1256_start_channel_task(ADS1256_DEVICE_2);
+    ads1256_start_readc(ADS1256_DEVICE_1);
+    // ads1256_start_channel_task(ADS1256_DEVICE_1);
 }

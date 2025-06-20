@@ -9,6 +9,11 @@
 TaskHandle_t DRDY1_task = NULL;
 TaskHandle_t DRDY2_task = NULL;
 static ads1256_device_t device_copy;
+#define BUFFER_SIZE (60000) // 1 MB / sizeof(int32_t) = 262144 próbek
+
+static int32_t value_buffer[BUFFER_SIZE] = {2137};
+static size_t buffer_index = 0;
+
 
 char* ads1256_device_to_string(ads1256_device_t device) {
     switch (device) {
@@ -134,7 +139,7 @@ bool ads1256_set_value(uint8_t register_address, uint8_t value, ads1256_device_t
     uint8_t tx[3] = {WREG_COMMAND | register_address, 0x00, value};
     res = res && ads1256_single_transmit(device, &tx[0], sizeof(tx));
     res = res && ads1256_single_transmit(device, &tx[1], sizeof(tx));
-    res = res && ads1256_single_transmit(device, &tx[3], sizeof(tx));
+    res = res && ads1256_single_transmit(device, &tx[2], sizeof(tx));
     esp_rom_delay_us(2); 
     gpio_set_level(device,1);
 
@@ -224,9 +229,11 @@ bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_1, 1));  
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_1, 1)); 
-    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 1)); 
+    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 0)); 
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_1, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_2, 1)); 
+
+    ESP_LOGI("ADS1256", "%d\n", gpio_get_level(CS_GPIO_2));
 
     /*init lokalny gpio input*/
 
@@ -244,6 +251,9 @@ bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
         io_conf.pin_bit_mask = 1ULL << input_pins[i];
         gpio_config(&io_conf);
     }
+
+    gpio_intr_enable(DRDY_GPIO_1);
+    gpio_intr_enable(DRDY_GPIO_2);
 
     if(install_isr_service() == false)
     {
@@ -285,7 +295,7 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 status register");
         return false;
     }
-    if(ads1256_set_value(0x01, MUX_REGISTER_FIRST_CHANNEL, device))
+    if(ads1256_set_value(0x01, MUX_REGISTER_FOURTH_CHANNEL, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 MUX register set successfully");
     }
@@ -304,7 +314,7 @@ bool ads1256_init(ads1256_device_t device)
         return false;
     }
 
-    if(ads1256_set_value(0x03, DATA_RATE_REGISTER_7500SPS, device))
+    if(ads1256_set_value(0x03, DATA_RATE_REGISTER_30000SPS, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 data rate register set successfully");
     }
@@ -396,11 +406,12 @@ void ads1256_read_data_continuously(void*  pvParameters)
     // uint16_t counter = 0;
     /* counting average of measurments */
 
+    //petla for do debuga
     
-    while (1)
+    for(int i = 0; i < 60000 ; i++) 
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
+        // esp_rom_delay_us(500); 
         gpio_set_level(device, 0);
         if(!_ads1256_spi_transmit(dummy_data, sizeof(dummy_data), data.channel_1, sizeof(data.channel_1)))
         {
@@ -412,7 +423,14 @@ void ads1256_read_data_continuously(void*  pvParameters)
         if (value & 0x800000) {
             value |= 0xFF000000;
         }
-        ESP_LOGI("ADS1256", "Raw sign value: %d on %s", value, ads1256_device_to_string(device));
+        // ESP_LOGI("ADS1256", "Raw sign value: %d on %s", value, ads1256_device_to_string(device));
+
+        if (buffer_index < BUFFER_SIZE) {
+            value_buffer[buffer_index++] = value;
+        } else {
+            ESP_LOGW("ADS1256", "Buffer full! Ignoring new values.");
+        }
+        
 
         /* counting average of measurments */
         // counter ++;
@@ -422,6 +440,13 @@ void ads1256_read_data_continuously(void*  pvParameters)
 
 
     }
+
+
+    for (size_t i = 0; i < buffer_index; i++) {
+        ESP_LOGI("ADS1256", "Buffered value[%d]: %d", i, value_buffer[i]);
+        vTaskDelay(pdMS_TO_TICKS(10)); // Spowolnienie wypisywania
+    }
+    vTaskDelete(NULL);
 }
 
 void ads1256_start_readc(ads1256_device_t device)
@@ -441,11 +466,12 @@ void ads1256_start_readc(ads1256_device_t device)
         ESP_LOGI("ADS1256", "Continuous read started on %s", ads1256_device_to_string(device));
     }
 
-    esp_rom_delay_us(7);
+    vTaskDelay(pdMS_TO_TICKS(1)); 
+
     gpio_set_level(device, 1); 
 
 
-    xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 4096, (void*)&device_copy, 10, &DRDY2_task);
+    xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 4096, (void*)&device_copy, 10, &DRDY1_task);
 
 
 }
@@ -487,5 +513,5 @@ void ads1256_data_from_channels(void*  pvParameters)
 void ads1256_start_channel_task(ads1256_device_t device)
 {
     device_copy = device;
-    xTaskCreate(ads1256_data_from_channels, "ads1256_task", 4096, (void*)&device_copy, 10, &DRDY2_task);
+    xTaskCreate(ads1256_data_from_channels, "ads1256_task", 4096, (void*)&device_copy, 10, &DRDY1_task);
 }

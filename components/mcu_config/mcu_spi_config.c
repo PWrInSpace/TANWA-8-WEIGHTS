@@ -48,7 +48,7 @@ esp_err_t mcu_spi_deinit(void) {
 bool _ads1256_add_device(void) {
   esp_err_t ret;
 
-  spi_device_interface_config_t dev = {.clock_speed_hz = 1000000,
+  spi_device_interface_config_t dev = {.clock_speed_hz = 400000,
                                        .mode = 1,
                                        .spics_io_num = -1,
                                        .queue_size = 1,
