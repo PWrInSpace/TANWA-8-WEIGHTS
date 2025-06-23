@@ -52,6 +52,19 @@
 #define RESET_COMMAND 0xFE // Reset
 #define STANDBY_COMMAND 0xFD // Standby
 
+//registers
+#define STATUS_REGISTER 0x00 // Status register
+#define MUX_REGISTER 0x01 // Multiplexer register
+// #define ADCON_REGISTER 0x02 // ADC control register
+#define DATA_RATE_REGISTER 0x03 // Data rate register
+#define IO_REGISTER 0x04 // IO register
+#define OFC0_REGISTER 0x05 // Offset calibration register 0
+#define OFC1_REGISTER 0x06 // Offset calibration register 1
+#define OFC2_REGISTER 0x07 // Offset calibration register 2
+#define FSC0_REGISTER 0x08 // Full-scale calibration register 0
+#define FSC1_REGISTER 0x09 // Full-scale calibration register 1
+#define FSC2_REGISTER 0x0A // Full-scale calibration register 2
+
 
 // typedef struct ads1256_config_t
 // {
