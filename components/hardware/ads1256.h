@@ -3,6 +3,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "freertos/queue.h"
+
+#define QUEUE_LENGTH 20
+
 
 #define CS_GPIO_1 15 //TODO: zabrac z configu GPIO
 #define CS_GPIO_2 7
@@ -20,7 +27,7 @@
 #define MUX_REGISTER_THIRD_CHANNEL 0x45  // AIN4+ AIN5-
 #define MUX_REGISTER_FOURTH_CHANNEL 0x67 // AIN6+ AIN7-
 
-#define ADCON_REGISTER 0x06 // Gain = 64 (max output ~ 10mV) clck off debug off
+#define ADCON_REGISTER_SETUP 0x06 // Gain = 64 (max output ~ 10mV) clck off debug off
 
 #define DATA_RATE_REGISTER_2P5SPS 0x03 // 2.5SPS
 #define DATA_RATE_REGISTER_5SPS 0x13 // 5SPS (samples per second)
@@ -55,7 +62,7 @@
 //registers
 #define STATUS_REGISTER 0x00 // Status register
 #define MUX_REGISTER 0x01 // Multiplexer register
-// #define ADCON_REGISTER 0x02 // ADC control register
+#define ADCON_REGISTER 0x02 // ADC control register
 #define DATA_RATE_REGISTER 0x03 // Data rate register
 #define IO_REGISTER 0x04 // IO register
 #define OFC0_REGISTER 0x05 // Offset calibration register 0
@@ -66,42 +73,50 @@
 #define FSC2_REGISTER 0x0A // Full-scale calibration register 2
 
 
-// typedef struct ads1256_config_t
-// {
-//     uint8_t status_register; // Default 0x00
-//     uint8_t mux_register; // First channel AIN0+ AIN1- 0x01
-//     uint8_t adcon_register; // Gain = 64 (max output ~ 10mV) clck off debug off 0x06
-//     uint8_t data_rate_register; // 100SPS (samples per second) 0x82
-    
-// }ads1256_config_t;
-
-// typedef struct ads1256_device_t
-// {
-//     ads1256_config_t config; // Configuration of ADS1256
-//     uint8_t id; // ID of ADS1256
-
-//     bool initialized; // Flag to check if ADS1256 is initialized
-//     bool reset; // Flag to check if ADS1256 is reset
-// }
 typedef enum ads1256_device_t
 {
     ADS1256_DEVICE_1 = CS_GPIO_1,
     ADS1256_DEVICE_2 = CS_GPIO_2
 } ads1256_device_t;
 
+/*
+{OFC0, OFC1, OFC2, FSC0, FSC1, FSC2, zero_offset}
+*/
+extern const uint8_t ads_cal_reg[8][6];
+extern const int32_t ads_cal_zero_offset[8];
+extern const double ads_cal_factor[8];
+
 typedef struct ads1256_raw_data_t
 {
-    uint8_t channel_1[3]; 
+    uint8_t channel_1[3];
+    uint8_t channel_2[3];
+    uint8_t channel_3[3];
+    uint8_t channel_4[3];
 }ads1256_raw_data_t;
 
+typedef struct ads1256_raw_data_sample_t //Used for queue in readc mode
+{
+    uint8_t data[3];
+}ads1256_raw_data_sample_t;
+
+typedef struct ads1256_data_t
+{
+    double channel_1;
+    double channel_2;
+    double channel_3;
+    double channel_4;
+}ads1256_data_t;
+
+extern QueueHandle_t ads1256_queue_1;
 
 bool ads1256_init(ads1256_device_t device);
-
-bool ads1256_get_raw_data(ads1256_device_t device, ads1256_raw_data_t* data);
-
+bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data);
 bool ads1256_read_id(ads1256_device_t device);
 bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_pins_init(void);
-void ads1256_start_channel_task(ads1256_device_t device);
-void ads1256_start_readc(ads1256_device_t device);
+void ads1256_start_channel_task(ads1256_device_t device); //TODO do task
+void ads1256_start_readc(ads1256_device_t device);//TODO do task
+
+
+
 #endif
