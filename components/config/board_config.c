@@ -45,26 +45,26 @@ esp_err_t board_config_init(void) {
 
     esp_err_t err;
     
-    err = mcu_gpio_init();
+    // err = mcu_gpio_init();
 
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "GPIO initialization failed");
-        return err;
-    }
+    // if (err != ESP_OK) {
+    //     ESP_LOGE(TAG, "GPIO initialization failed");
+    //     return err;
+    // }
 
-    err = mcu_twai_init();
+    // err = mcu_twai_init();
 
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "TWAI initialization failed");
-        return err;
-    }
+    // if (err != ESP_OK) {
+    //     ESP_LOGE(TAG, "TWAI initialization failed");
+    //     return err;
+    // }
 
-    err = can_config_init();
+    // err = can_config_init();
 
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "CAN initialization failed");
-        return err;
-    }
+    // if (err != ESP_OK) {
+    //     ESP_LOGE(TAG, "CAN initialization failed");
+    //     return err;
+    // }
 
     err = console_config_init();
 

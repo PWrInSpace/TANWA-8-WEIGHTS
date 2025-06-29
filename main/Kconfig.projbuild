@@ -138,17 +138,22 @@ menu "TANWA BOARD CONFIGURATION"
             help
                 GPIO number for SPI SCK pin.
         
-        config SPI_CS_A
+        config CS_1
             int "SPI CS GPIO"
             default 15
             help
                 GPIO number for SPI CS1 pin.
 
-        config SPI_CS_2
+        config CS_2
             int "SPI CS GPIO 2"
             default 7
             help
                 GPIO number for second SPI CS2 pin.
+        config SD_CS
+            int "SD CS GPIO"
+            default 21
+            help
+                GPIO number for SD card CS pin.
     endmenu
 
 endmenu

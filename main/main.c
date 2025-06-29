@@ -8,6 +8,7 @@
 #include "setup_task.h"
 #include "ads1256.h"
 #include "mcu_gpio_config.h"
+#include "sd_task.h"
 #define TAG "APP"
 
 extern board_config_t config;
@@ -21,8 +22,9 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to initialize setup task");
         return;
     }
-    vTaskDelay(pdMS_TO_TICKS(5000)); 
-    ads1256_start_readc(ADS1256_DEVICE_1);
+    // vTaskDelay(pdMS_TO_TICKS(5000));
+    // ads1256_start_readc(ADS1256_DEVICE_1);
     // ads1256_read_id(ADS1256_DEVICE_2);
     // ads1256_start_channel_task(ADS1256_DEVICE_1);
+    run_test_task();
 }

@@ -107,6 +107,12 @@ typedef struct ads1256_data_t
     double channel_4;
 }ads1256_data_t;
 
+typedef struct ads1256_frame_t
+{
+    uint8_t device_id;
+    ads1256_data_t data_from_device;
+
+}ads1256_frame_t;
 extern QueueHandle_t ads1256_queue_1;
 
 bool ads1256_init(ads1256_device_t device);

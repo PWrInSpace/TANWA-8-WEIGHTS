@@ -1,0 +1,14 @@
+#ifndef SD_TASK_H
+#define SD_TASK_H
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#include "esp_log.h"
+#define MOUNT_POINT "/sdcard"
+
+esp_err_t sd_task_init(void);
+void run_test_task(void);
+
+
+#endif
