@@ -85,6 +85,8 @@ typedef enum ads1256_device_t
 extern const uint8_t ads_cal_reg[8][6];
 extern const int32_t ads_cal_zero_offset[8];
 extern const double ads_cal_factor[8];
+extern TaskHandle_t DRDY1_task;
+extern TaskHandle_t DRDY2_task;
 
 typedef struct ads1256_raw_data_t
 {
@@ -115,13 +117,14 @@ typedef struct ads1256_frame_t
 }ads1256_frame_t;
 extern QueueHandle_t ads1256_queue_1;
 
+char* ads1256_device_to_string(ads1256_device_t device);
+bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length);
 bool ads1256_init(ads1256_device_t device);
 bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data);
 bool ads1256_read_id(ads1256_device_t device);
 bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_pins_init(void);
 void ads1256_start_channel_task(ads1256_device_t device); //TODO do task
-void ads1256_start_readc(ads1256_device_t device);//TODO do task
 
 
 

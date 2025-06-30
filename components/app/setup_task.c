@@ -11,6 +11,7 @@
 #include "mcu_gpio_config.h"
 #include "ads1256.h"
 #include "sd_task.h"
+#include "ads1256_task.h"
 
 #define SETUP_TASK_STACK_SIZE CONFIG_SETUP_TASK_STACK_SIZE
 #define SETUP_TASK_PRIORITY CONFIG_SETUP_TASK_PRIORITY
@@ -64,10 +65,14 @@ esp_err_t setup_task_init(void) {
     else {
         ESP_LOGI(TAG, "SD task initialized successfully");
     }
-
-    ads1256_pins_init();
-    ads1256_init(ADS1256_DEVICE_1);
-    // ads1256_init(ADS1256_DEVICE_2);
+    if(!ads1256_task_init())
+    {
+        ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
+        return ESP_FAIL;
+    }
+    else {
+        ESP_LOGI(TAG, "ADS1256 task initialized successfully");
+    }
     // Create the setup task
     if(xTaskCreatePinnedToCore(setup_task, "setup_task", SETUP_TASK_STACK_SIZE, NULL, SETUP_TASK_PRIORITY, &setup_task_handle, SETUP_TASK_CORE_ID) == pdPASS) {
         ESP_LOGI(TAG, "Setup task created successfully");

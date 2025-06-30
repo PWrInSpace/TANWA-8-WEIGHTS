@@ -85,3 +85,35 @@ bool _ads1256_spi_transmit(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_da
 
   return true;
 }
+
+bool _ads1256_spi_transmit_queued(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_data, size_t rx_len)
+{
+    spi_transaction_t trans = {
+        .flags = 0,
+        .length = 8 * tx_len,
+        .tx_buffer = tx_data,
+        .rxlength = 8 * rx_len,
+        .rx_buffer = rx_data
+    };
+
+    xSemaphoreTake(mutex_spi, portMAX_DELAY);
+    gpio_set_level(15, 0);
+    esp_err_t ret = spi_device_queue_trans(spi_config.spi_ads1256_handle, &trans, portMAX_DELAY);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "spi_device_queue_trans failed: %s", esp_err_to_name(ret));
+        xSemaphoreGive(mutex_spi);
+        return false;
+    }
+
+    spi_transaction_t *ret_trans;
+    ret = spi_device_get_trans_result(spi_config.spi_ads1256_handle, &ret_trans, portMAX_DELAY);
+    gpio_set_level(15, 1);
+    xSemaphoreGive(mutex_spi);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "spi_device_get_trans_result failed: %s", esp_err_to_name(ret));
+        return false;
+    }
+
+    return true;
+}

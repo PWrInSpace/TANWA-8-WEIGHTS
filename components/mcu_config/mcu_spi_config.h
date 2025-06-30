@@ -44,6 +44,8 @@
     .spi_init_flag = false,                        \
   }
 
+extern SemaphoreHandle_t mutex_spi;
+
 typedef struct {
   spi_host_device_t host_id;
   spi_device_handle_t spi_ads1256_handle;
@@ -78,5 +80,5 @@ bool _ads1256_add_device(void);
  * \param[in] rx_len length of output buffer
  */
 bool _ads1256_spi_transmit(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_data, size_t rx_len);
-
+bool _ads1256_spi_transmit_queued(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_data, size_t rx_len);
 #endif /* PWRINSPACE_MCU_SPI_CONFIG_H_ */

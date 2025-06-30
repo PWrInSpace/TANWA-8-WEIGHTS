@@ -494,31 +494,6 @@ bool ads1256_read_id(ads1256_device_t device)
     return true;
 }
 
-void ads1256_read_data_continuously(void*  pvParameters)
-{
-    ads1256_device_t* device = (ads1256_device_t*)pvParameters;
-    uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
-    ads1256_raw_data_sample_t raw_data;
-
-    while (1)
-    {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-        gpio_set_level(*device, 0);
-        if(!_ads1256_spi_transmit(dummy_data, sizeof(dummy_data), raw_data.data, sizeof(raw_data.data)))
-        {
-            ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
-        }
-        gpio_set_level(*device, 1);
-
-        xQueueSend(ads1256_queue_1, &raw_data , portMAX_DELAY);
-
-    }
-
-    free(device);
-    vTaskDelete(NULL);
-
-}
 
 // void ads1256_read_data_continuously(void*  pvParameters)  //!FOR TESTING PURPOSES!
 // {
@@ -576,37 +551,6 @@ void ads1256_read_data_continuously(void*  pvParameters)
 //     vTaskDelete(NULL);
 // }
 
-void ads1256_start_readc(ads1256_device_t device)
-{
-    uint8_t tx_data = RDATAC_COMMAND;
-
-    ads1256_device_t* device_ptr = malloc(sizeof(ads1256_device_t));
-    if (device_ptr == NULL) {
-        ESP_LOGE("ADS1256", "Failed to allocate memory for device");
-        return;
-    }
-
-    *device_ptr = device;
-
-    gpio_set_level(device, 0); 
-    if(ads1256_single_transmit(device, &tx_data, sizeof(tx_data)) == false)
-    {
-        ESP_LOGE("ADS1256", "Failed to start continuous read on ADS1256");
-    }
-    else
-    {
-        ESP_LOGI("ADS1256", "Continuous read started on %s", ads1256_device_to_string(device));
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(1)); 
-
-    gpio_set_level(device, 1); 
-
-
-    xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 4096, (void*)device_ptr, 10, &DRDY1_task);
-
-
-}
 
 
 void ads1256_data_from_channels(void*  pvParameters)
