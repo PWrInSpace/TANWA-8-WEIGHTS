@@ -302,7 +302,7 @@ bool ads1256_pins_init(void)
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_1, 1));  
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_1, 1)); 
-    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 0)); 
+    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_1, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_2, 1)); 
 

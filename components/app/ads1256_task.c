@@ -74,7 +74,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
         {
             ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
         }
-        // gpio_set_level(*device, 1);
+        gpio_set_level(*device, 1);
         buffer_readc_index+=3;
 
         if(buffer_readc_index % 1000 == 2) 

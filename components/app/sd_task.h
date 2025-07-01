@@ -11,5 +11,7 @@
 esp_err_t sd_task_init(void);
 void run_test_task(void);
 
+void save_ads1256_buffor_task(void *arg);
+void test(void *arg);
 
 #endif

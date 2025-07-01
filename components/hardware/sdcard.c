@@ -8,26 +8,30 @@
 #include "sd_test_io.h"
 
 #include "esp_log.h"
+#include "driver/sdmmc_host.h"
+#include "driver/sdmmc_defs.h"
+#include "esp_vfs_fat.h"
+#include "sdmmc_cmd.h"
 
 #define TAG "SDCARD"
 
-const char* names[] = {"CLK ", "MOSI", "MISO", "CS  "};
-const int pins[] = {CONFIG_SPI_SCK,
-                    CONFIG_SPI_MOSI,
-                    CONFIG_SPI_MISO,
-                    CONFIG_SD_CS};
-const int pin_count = sizeof(pins)/sizeof(pins[0]);
+// const char* names[] = {"CLK ", "MOSI", "MISO", "CS  "};
+// const int pins[] = {CONFIG_SPI_SCK,
+//                     CONFIG_SPI_MOSI,
+//                     CONFIG_SPI_MISO,
+//                     CONFIG_SD_CS};
+// const int pin_count = sizeof(pins)/sizeof(pins[0]);
 
-pin_configuration_t pin_config = {
-    .names = names,
-    .pins = pins,
-};
+// pin_configuration_t pin_config = {
+//     .names = names,
+//     .pins = pins,
+// };
 
 bool SD_init(sd_card_t *sd_card, sd_card_config_t *cfg) {
-  sd_card->spi_host = cfg->spi_host;
-  sd_card->cs_pin = cfg->cs_pin;
-  sd_card->card_detect_pin = cfg->cd_pin;
+  // sd_card->spi_host = cfg->spi_host;
+  // sd_card->card_detect_pin = cfg->cd_pin;
   sd_card->mount_point = cfg->mount_point;
+
 
   // Options for mounting the filesystem
   if (SD_mount(sd_card) == false) {
@@ -47,23 +51,43 @@ bool SD_file_exists(const char *file_name) {
 }
 
 bool SD_mount(sd_card_t *sd_card) {
+
   esp_err_t res;
+
+  sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+
+  // KONFIGURACJA PINÓW TWOICH
+  sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+  slot_config.width = 4;
+  slot_config.clk = 13;  // twój CLK
+  slot_config.cmd = 2;   // twój CMD
+  slot_config.d0  = 12;  // twój D0
+  slot_config.d1  = 5;   // twój D1
+  slot_config.d2  = 14;  // twój D2
+  slot_config.d3  = 21;  // twój D3
+
+  // WŁĄCZENIE WEWNĘTRZNYCH PULLUP
+  slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+
+  // Montowanie FAT
   esp_vfs_fat_sdmmc_mount_config_t mount_config = {
       .format_if_mount_failed = false,
       .max_files = 5,
-      .allocation_unit_size = 16 * 1024};
+      .allocation_unit_size = 16 * 1024
+  };
 
-  sdmmc_host_t host = SDSPI_HOST_DEFAULT();
-  // host.slot = sd_card->spi_host;
-  // host.max_freq_khz = SDMMC_FREQ_PROBING;
-  sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
-  slot_config.gpio_cs = sd_card->cs_pin;
-  slot_config.host_id = host.slot;
+  // sdmmc_card_t *card;
+  // res = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot_config,
+  //                               &mount_config, &card);
 
-  res = esp_vfs_fat_sdspi_mount(sd_card->mount_point, &host, &slot_config,
+  // if (res != ESP_OK) {
+  //     ESP_LOGE(TAG, "Failed to mount SD card: %s", esp_err_to_name(res));
+  //     return false;
+  // }
+  res = esp_vfs_fat_sdmmc_mount(sd_card->mount_point, &host, &slot_config,
                                 &mount_config, &sd_card->card);
   if (res != ESP_OK) {
-    ESP_LOGE("SD_INIT", "esp_vfs_fat_sdspi_mount failed: %s (0x%x)", esp_err_to_name(res), res);
+    ESP_LOGE("SD_INIT", "esp_vfs_fat_sdmmc_mount failed: %s (0x%x)", esp_err_to_name(res), res);
     if (res == ESP_FAIL) {
       ESP_LOGE(TAG,
                "Failed to mount filesystem. "
@@ -74,12 +98,13 @@ bool SD_mount(sd_card_t *sd_card) {
                "Failed to initialize the card (%s). "
                "Make sure SD card lines have pull-up resistors in place.",
                esp_err_to_name(res));
-               check_sd_card_pins(&pin_config, pin_count);
+              //  check_sd_card_pins(&pin_config, pin_count);
     }
     return false;
   }
   ESP_LOGI(TAG, "SD card mounted");
   sd_card->mounted = true;
+  
   return true;
 }
 

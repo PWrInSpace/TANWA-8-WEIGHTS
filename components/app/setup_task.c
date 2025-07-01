@@ -58,13 +58,13 @@ esp_err_t setup_task_init(void) {
         ESP_LOGI(TAG, "ADS1256 device added successfully");
     }
 
-    if(sd_task_init() != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize SD task");
-        return ESP_FAIL;
-    }
-    else {
-        ESP_LOGI(TAG, "SD task initialized successfully");
-    }
+    // if(sd_task_init() != ESP_OK) {
+    //     ESP_LOGE(TAG, "Failed to initialize SD task");
+    //     return ESP_FAIL;
+    // }
+    // else {
+    //     ESP_LOGI(TAG, "SD task initialized successfully");
+    // }
     if(!ads1256_task_init())
     {
         ESP_LOGE(TAG, "Failed to initialize ADS1256 task");

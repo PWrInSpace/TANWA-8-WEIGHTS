@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "mcu_spi_config.h" //mutex_spi
 #include "ads1256_task.h"
+#include "driver/sdmmc_host.h"
 
 #define TAG "SD_TASK"
 static sd_card_t sd_card;
@@ -10,7 +11,6 @@ static sd_card_t sd_card;
 esp_err_t sd_task_init(void) {
 
     sd_card_config_t config = {
-        .spi_host = SDSPI_DEFAULT_HOST,
         .mount_point = MOUNT_POINT,
         .cs_pin = 21,
         .cd_pin = -1
@@ -29,10 +29,10 @@ esp_err_t sd_task_init(void) {
 
 
 bool save_buffer_as_text(const char* path, uint8_t* buffer, size_t length) {
-    if (xSemaphoreTake(mutex_spi, portMAX_DELAY) != pdTRUE) {
-        ESP_LOGE("SDCARD", "Failed to take SPI mutex");
-        return false;
-    }
+    // if (xSemaphoreTake(mutex_spi, portMAX_DELAY) != pdTRUE) {
+    //     ESP_LOGE("SDCARD", "Failed to take SPI mutex");
+    //     return false;
+    // }
     FILE* f = fopen(path, "a");  // tryb tekstowy
     if (!f) {
         ESP_LOGE("SDCARD", "Failed to open file %s for writing", path);
@@ -44,7 +44,7 @@ bool save_buffer_as_text(const char* path, uint8_t* buffer, size_t length) {
     }
 
     fclose(f);
-    xSemaphoreGive(mutex_spi);
+    // xSemaphoreGive(mutex_spi);
     ESP_LOGI("SDCARD", "Buffer saved as text to %s (%d values)", path, length);
     return true;
 }
@@ -123,5 +123,5 @@ void test(void *arg)
 
 void run_test_task(void) {
     ESP_LOGI("SD_TASK", "Starting SD card test task");
-    xTaskCreate(save_ads1256_buffor_task, "test_task", 8192, NULL, 5, NULL);
+    xTaskCreate(test, "test_task", 8192, NULL, 5, NULL);
 }

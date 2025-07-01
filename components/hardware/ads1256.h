@@ -20,6 +20,21 @@
 #define DRDY_GPIO_1 18
 #define DRDY_GPIO_2 35
 
+
+// #define CS_GPIO_1 12 //TODO: zabrac z configu GPIO
+// #define CS_GPIO_2 2
+// #define RESET_GPIO_1 5
+// #define RESET_GPIO_2 14
+// #define PWDN_GPIO_1 13
+// #define PWDN_GPIO_2 21
+
+// slot_config.clk = 12;
+// slot_config.cmd = 2;
+// slot_config.d0  = 5;
+// slot_config.d1  = 14;
+// slot_config.d2  = 13;
+// slot_config.d3  = 21;
+
 #define STATUS_REGISTER_DEFAULT 0x00
 
 #define MUX_REGISTER_FIRST_CHANNEL 0x01 // AIN0+ AIN1-
