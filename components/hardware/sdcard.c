@@ -59,11 +59,11 @@ bool SD_mount(sd_card_t *sd_card) {
   // KONFIGURACJA PINÓW TWOICH
   sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
   slot_config.width = 4;
-  slot_config.clk = 13;  // twój CLK
+  slot_config.clk = 14;  // twój CLK
   slot_config.cmd = 2;   // twój CMD
   slot_config.d0  = 12;  // twój D0
   slot_config.d1  = 5;   // twój D1
-  slot_config.d2  = 14;  // twój D2
+  slot_config.d2  = 1;  // twój D2
   slot_config.d3  = 21;  // twój D3
 
   // WŁĄCZENIE WEWNĘTRZNYCH PULLUP

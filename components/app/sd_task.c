@@ -26,28 +26,46 @@ esp_err_t sd_task_init(void) {
     return ESP_OK;
 
 }
-
-
-bool save_buffer_as_text(const char* path, uint8_t* buffer, size_t length) {
-    // if (xSemaphoreTake(mutex_spi, portMAX_DELAY) != pdTRUE) {
-    //     ESP_LOGE("SDCARD", "Failed to take SPI mutex");
-    //     return false;
-    // }
-    FILE* f = fopen(path, "a");  // tryb tekstowy
+bool save_buffer_as_binary(const char* path, uint8_t* buffer, size_t length) {
+    FILE* f = fopen(path, "ab");  // append binary
     if (!f) {
-        ESP_LOGE("SDCARD", "Failed to open file %s for writing", path);
+        ESP_LOGE("SDCARD", "Failed to open %s for writing", path);
         return false;
     }
 
-    for (size_t i = 0; i < length; i+= 3) {
-        fprintf(f, "%d %d %d\n", buffer[i], buffer[i+1], buffer[i+2]);  // zapisz każdą wartość w osobnej linii
+    size_t written = fwrite(buffer, 1, length, f);
+    fclose(f);
+
+    if (written != length) {
+        ESP_LOGE("SDCARD", "Short write: %zu of %zu", written, length);
+        return false;
     }
 
-    fclose(f);
-    // xSemaphoreGive(mutex_spi);
-    ESP_LOGI("SDCARD", "Buffer saved as text to %s (%d values)", path, length);
+    ESP_LOGI("SDCARD", "Buffer saved as binary to %s (%d bytes)", path, length);
     return true;
 }
+
+
+// bool save_buffer_as_text(const char* path, uint8_t* buffer, size_t length) {
+//     // if (xSemaphoreTake(mutex_spi, portMAX_DELAY) != pdTRUE) {
+//     //     ESP_LOGE("SDCARD", "Failed to take SPI mutex");
+//     //     return false;
+//     // }
+//     FILE* f = fopen(path, "a");  // tryb tekstowy
+//     if (!f) {
+//         ESP_LOGE("SDCARD", "Failed to open file %s for writing", path);
+//         return false;
+//     }
+
+//     for (size_t i = 0; i < length; i+= 3) {
+//         fprintf(f, "%d %d %d\n", buffer[i], buffer[i+1], buffer[i+2]);  // zapisz każdą wartość w osobnej linii
+//     }
+
+//     fclose(f);
+//     // xSemaphoreGive(mutex_spi);
+//     ESP_LOGI("SDCARD", "Buffer saved as text to %s (%d values)", path, length);
+//     return true;
+// }
 
 
 void save_ads1256_buffor_task(void *arg)
@@ -67,7 +85,7 @@ void save_ads1256_buffor_task(void *arg)
 
         if (sd_card.mounted) {
             ESP_LOGI(TAG, "SD card is mounted, saving data...");
-            if (save_buffer_as_text(test_filename, buffer_readc_A, BUFFER_READC_SIZE)) {
+            if (save_buffer_as_binary(test_filename, buffer_readc_A, BUFFER_READC_SIZE)) {
                 ESP_LOGI(TAG, "Data saved successfully to /sdcard/ads1256_data_A.bin");
             } else {
                 ESP_LOGE(TAG, "Failed to save data to SD card");
@@ -88,7 +106,7 @@ void save_ads1256_buffor_task(void *arg)
 
         if (sd_card.mounted) {
             ESP_LOGI(TAG, "SD card is mounted, saving data...");
-            if (save_buffer_as_text(test_filename, buffer_readc_B, BUFFER_READC_SIZE)) {
+            if (save_buffer_as_binary(test_filename, buffer_readc_B, BUFFER_READC_SIZE)) {
                 ESP_LOGI(TAG, "Data saved successfully to /sdcard/ads1256_data_B.bin");
             } else {
                 ESP_LOGE(TAG, "Failed to save data to SD card");
