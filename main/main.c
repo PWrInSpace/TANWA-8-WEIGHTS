@@ -18,23 +18,17 @@ void app_main(void) {
     
 
     ESP_LOGI(TAG, "%s TANWA board starting", config.board_name);
-    sd_task_init();
-    // vTaskDelay(pdMS_TO_TICKS(5000)); // Delay to ensure SD card is ready
+    printf("Size: %zu\n", sizeof(readc_frame_t));
     void* task_handle = NULL;
     if(setup_task_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize setup task");
         return;
     }
-    vTaskDelay(pdMS_TO_TICKS(3000)); // Delay to ensure SD card is ready
-    ads1256_start_readc(ADS1256_DEVICE_1);
-    vTaskDelay(pdMS_TO_TICKS(3000)); // Delay to ensure SD card is ready
-    save_ads1256_buffor_task(task_handle);
 
-    // vTaskDelay(pdMS_TO_TICKS(5000));
-    // ads1256_start_readc(ADS1256_DEVICE_1);
-    // ads1256_read_id(ADS1256_DEVICE_2);
-    // ads1256_start_channel_task(ADS1256_DEVICE_1);
-    // run_test_task();
+    fprintf(stdout, "Setup task initialized successfully\n");
+    fprintf(stderr, "Setup task initialized successfully\n");
+
+    // ads1256_read_data_continuously_test_task(); // Start the ADS1256 read data task for testing purposes
 }
 
 

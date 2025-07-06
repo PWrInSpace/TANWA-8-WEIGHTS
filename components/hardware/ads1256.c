@@ -302,7 +302,7 @@ bool ads1256_pins_init(void)
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_1, 1));  
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_1, 1)); 
-    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 1)); 
+    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 0)); 
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_1, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_2, 1)); 
 
@@ -377,7 +377,7 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 status register");
         return false;
     }
-    if(ads1256_set_value(MUX_REGISTER, MUX_REGISTER_THIRD_CHANNEL, device))
+    if(ads1256_set_value(MUX_REGISTER, MUX_REGISTER_SECOND_CHANNEL, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 MUX register set successfully");
     }
@@ -396,7 +396,7 @@ bool ads1256_init(ads1256_device_t device)
         return false;
     }
 
-    if(ads1256_set_value(DATA_RATE_REGISTER, DATA_RATE_REGISTER_30000SPS, device))
+    if(ads1256_set_value(DATA_RATE_REGISTER, DATA_RATE_REGISTER_7500SPS, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 data rate register set successfully");
     }
@@ -495,61 +495,94 @@ bool ads1256_read_id(ads1256_device_t device)
 }
 
 
-// void ads1256_read_data_continuously(void*  pvParameters)  //!FOR TESTING PURPOSES!
-// {
-//     ads1256_device_t* device = (ads1256_device_t*)pvParameters;
-//     ads1256_raw_data_t data;
-//     uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
-//     int32_t value = 0;
-//     //-6230 - 2000 -> -6230/2000 -> 3.115 to 1g
+void ads1256_read_data_continuouslyy(void*  pvParameters)  //!FOR TESTING PURPOSES!
+{
+    ads1256_device_t* device = (ads1256_device_t*)pvParameters;
+    ads1256_raw_data_t data;
+    uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
+    int32_t value = 0;
+    int32_t zero_offset = 0;
+    //-6230 - 2000 -> -6230/2000 -> 3.115 to 1g
 
-//     /* counting average of measurments */
-//     int64_t sum = 0;
-//     uint16_t counter = 0;
-//     /* counting average of measurments */
-//     double grams = 0.0f;
-//     //petla for do debuga
-//     // while (1)
+    /* counting average of measurments */
+    int64_t sum = 0;
+    uint16_t counter = 0;
+    /* counting average of measurments */
+    double grams = 0.0f;
+    //petla for do debuga
+    // while (1)
 
-//     for(int i = 0; i < 30000*10 ; i++) 
-//     {
-//         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-//         gpio_set_level(*device, 0);
-//         if(!_ads1256_spi_transmit(dummy_data, sizeof(dummy_data), data.channel_1, sizeof(data.channel_1)))
-//         {
-//             ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
-//         }
-//         gpio_set_level(*device, 1);
+    for(int i = 0; i < 30000*10 ; i++) 
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        gpio_set_level(*device, 0);
+        if(!_ads1256_spi_transmit(dummy_data, sizeof(dummy_data), data.channel_1, sizeof(data.channel_1)))
+        {
+            ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
+        }
+        gpio_set_level(*device, 1);
 
-//         value = (data.channel_1[0] << 16) | (data.channel_1[1] << 8) | data.channel_1[2];
-//         if (value & 0x800000) {
-//             value |= 0xFF000000;
-//         }
-//         value -= zero_offset; // Adjusting the value with zero offset
-//         grams = (double)value / -3.115; 
-//         // ESP_LOGI("ADS1256", "Raw sign value: %d on %s", value, ads1256_device_to_string(device));
-//             // -4470
-//         value_buffer[(buffer_index++)%BUFFER_SIZE] = grams;
-//         ESP_LOGI("ADS1256", "Weight %.4f grams on %s", grams, ads1256_device_to_string(device));
+        value = (data.channel_1[0] << 16) | (data.channel_1[1] << 8) | data.channel_1[2];
+        if (value & 0x800000) {
+            value |= 0xFF000000;
+        }
+        value -= zero_offset; // Adjusting the value with zero offset
+        ESP_LOGI("ADS1256", "Raw value: %d on %s", value, ads1256_device_to_string(*device));
+        grams = (double)value / -3.115; 
+        // ESP_LOGI("ADS1256", "Raw sign value: %d on %s", value, ads1256_device_to_string(device));
+            // -4470
+        // value_buffer[(buffer_index++)%BUFFER_SIZE] = grams;
+
+        // ESP_LOGI("ADS1256", "Weight %.4f grams on %s", grams, ads1256_device_to_string(*device));
         
 
-//         /* counting average of measurments */
-//         counter ++;
-//         sum += value;
-//         // ESP_LOGI("ADS1256", "Average value after %d reads: %lld on %s", counter, sum / counter, ads1256_device_to_string(device));
-//         /* counting average of measurments */
+        /* counting average of measurments */
+        counter ++;
+        sum += value;
+        // ESP_LOGI("ADS1256", "Average value after %d reads: %lld on %s", counter, sum / counter, ads1256_device_to_string(device));
+        /* counting average of measurments */
 
 
-//     }
+    }
 
 
-//     for (size_t i = 0; i < buffer_index; i++) {
-//         ESP_LOGI("ADS1256", "Buffered value[%d]: %.4f", i, value_buffer[i]);
-//         vTaskDelay(pdMS_TO_TICKS(10)); // Spowolnienie wypisywania
-//     }
-//     free(device);
-//     vTaskDelete(NULL);
-// }
+    // for (size_t i = 0; i < buffer_index; i++) {
+    //     ESP_LOGI("ADS1256", "Buffered value[%d]: %.4f", i, value_buffer[i]);
+    //     vTaskDelay(pdMS_TO_TICKS(10)); // Spowolnienie wypisywania
+    // }
+    free(device);
+    vTaskDelete(NULL);
+}
+
+void ads1256_read_data_continuously_test_task(void)
+{
+
+    uint8_t tx_data = RDATAC_COMMAND;
+
+    ads1256_device_t* device_ptr = malloc(sizeof(ads1256_device_t));
+    if (device_ptr == NULL) {
+        ESP_LOGE("ADS1256", "Failed to allocate memory for device");
+        return;
+    }
+    *device_ptr = ADS1256_DEVICE_1; // Set the device to ADS1256_DEVICE_1
+
+    gpio_set_level(*device_ptr, 0); 
+    if(ads1256_single_transmit(*device_ptr, &tx_data, sizeof(tx_data)) == false)
+    {
+        ESP_LOGE("ADS1256", "Failed to start continuous read on ADS1256");
+    }
+    else
+    {
+        ESP_LOGI("ADS1256", "Continuous read started on %s", ads1256_device_to_string(*device_ptr));
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(1)); 
+
+    gpio_set_level(*device_ptr, 1);
+
+
+    xTaskCreate(ads1256_read_data_continuouslyy, "ads1256_task", 4096, (void*)device_ptr, 10, &DRDY1_task);
+}
 
 
 

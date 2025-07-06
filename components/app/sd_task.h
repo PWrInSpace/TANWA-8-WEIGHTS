@@ -12,6 +12,9 @@ esp_err_t sd_task_init(void);
 void run_test_task(void);
 
 void save_ads1256_buffor_task(void *arg);
+void run_readc_sd_task(void);
+bool print_file(const char* path);
+bool empty_file(const char* path);
 void test(void *arg);
 
 #endif

@@ -6,6 +6,9 @@
 #include "esp_log.h"
 
 #include "can_api.h"
+#include "timers_config.h"
+#include "ads1256_task.h"
+#include "sd_task.h"
 
 #define APP_TASK_STACK_SIZE CONFIG_APP_TASK_STACK_SIZE
 #define APP_TASK_PRIORITY CONFIG_APP_TASK_PRIORITY
@@ -32,6 +35,18 @@ esp_err_t app_task_deinit(void) {
     }
     
     return ESP_OK;
+}
+
+    
+void start_readc_task(void) {
+    ESP_LOGI("APP_TASK", "Starting readc task");
+
+    ads1256_start_readc(ADS1256_DEVICE_1);
+    run_readc_sd_task();
+
+    ESP_LOGI("APP_TASK", "Readc task started");
+
+    start_stopping_readc_task(15);
 }
 
 void app_task(void *arg) {
