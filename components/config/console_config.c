@@ -41,9 +41,38 @@ int start_timer_test(int argc, char **argv) {
 }
 
 int readc_task(int argc, char **argv) {
-    // This function is a placeholder for starting the readc task
+    if(argc != 3)
+    {
+        ESP_LOGE(TAG, "Usage: command [dev_num] [time]");
+        return -1;
+    }
+    int device = atoi(argv[1]);
+    uint8_t time = atoi(argv[2]);
+
+    ads1256_device_t dev;
+
+    if(device == 1)
+    {
+        dev = ADS1256_DEVICE_1;
+    }
+    else if(device == 2)
+    {
+        dev = ADS1256_DEVICE_2;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+
+    if(time < 1)
+    {
+        ESP_LOGE(TAG, "Time value must be greater than 0");
+        return -1;
+    }
     ESP_LOGI(TAG, "Starting readc task from cmd");
-    start_readc_task();
+
+    start_readc_task(dev, time);
     return 0;
 }
 
@@ -166,6 +195,111 @@ int ads1256_get_sampes(int argc, char **argv)
 
     return 0;
 }
+
+int read_cal_registers(int argc, char **argv)
+{
+    if(argc != 2)
+    {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+
+    if(device == 1)
+    {
+        dev = ADS1256_DEVICE_1;
+    }
+    else if(device == 2)
+    {
+        dev = ADS1256_DEVICE_2;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+
+    if(!ads1256_read_cal_registers(dev))
+    {
+        ESP_LOGE(TAG, "Failed to read calibration registers");
+        return -1;
+    }
+
+    ESP_LOGI(TAG, "Calibration registers read successfully for device %d", device);
+    return 0;
+}
+
+int calibrate_device(int argc, char **argv)
+{
+    if(argc != 2)
+    {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+    if(device == 1)
+    {
+        dev = ADS1256_DEVICE_1;
+    }
+    else if(device == 2)
+    {
+        dev = ADS1256_DEVICE_2;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+    if(!ads1256_self_cal(dev))
+    {
+        ESP_LOGE(TAG, "Failed to perform self-calibration on device %d", device);
+        return -1;
+    }
+    ESP_LOGI(TAG, "Self-calibration completed successfully for device %d", device);
+
+    if(!ads1256_read_cal_registers(dev))
+    {
+        ESP_LOGE(TAG, "Failed to read calibration registers");
+        return -1;
+    }
+    ESP_LOGI(TAG, "Calibration registers read successfully for device %d", device);
+    return 0;
+}
+
+int ads1256_reset_cli(int argc, char **argv)
+{
+    if(argc != 2)
+    {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+    if(device == 1)
+    {
+        dev = ADS1256_DEVICE_1;
+    }
+    else if(device == 2)
+    {
+        dev = ADS1256_DEVICE_2;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+    if(!ads1256_reset(dev))
+    {
+        ESP_LOGE(TAG, "Failed to reset device %d", device);
+        return -1;
+    }
+    ESP_LOGI(TAG, "Device %d reset successfully", device);
+    return 0;
+}
+
  // Place for the console configuration
 
  static esp_console_cmd_t cmd [] = {
@@ -173,11 +307,15 @@ int ads1256_get_sampes(int argc, char **argv)
  // cmd     help description   hint  function      args
  {"reset", "Reset the device", NULL, reset_device, NULL},
  {"timer_test", "Start a test timer", NULL, start_timer_test, NULL},
- {"readc_task_on_15sek", "Start the readc task", NULL, readc_task, NULL},
+ {"readc_task", "Start the readc task", NULL, readc_task, NULL},
 {"read_sd_file", "Read a file from the SD card", NULL, read_sd_file, NULL},
 {"empty_sd_file", "Empty a file on the SD card", NULL, empty_sd_file, NULL},
 {"ads_samples", "Returns read data for n sec (int dev, int samples)", NULL,ads1256_get_sampes, NULL },
 {"ads_change_mux", "Mux change command (int mux nr) 1-4 dev1 muxs 5-8 dev2 muxs", NULL, change_mux_channel, NULL},
+{"ads_read_cal", "Read calibration registers (int dev_num)", NULL, read_cal_registers, NULL},
+{"ads_calibrate", "Calibrate device (int dev_num)", NULL, calibrate_device, NULL},
+{"ads_reset", "Reset device (int dev_num)", NULL, ads1256_reset_cli,NULL},
+{"ads_cal_reg", "Read calibration registers (int dev_num)", NULL, read_cal_registers, NULL},
  };
 
 esp_err_t console_config_init() {

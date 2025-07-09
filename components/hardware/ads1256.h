@@ -141,7 +141,8 @@ bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_pins_init(void);
 void ads1256_start_channel_task(ads1256_device_t device); //TODO do task
 void ads1256_read_data_continuously_test_task(void);
-
-
+bool ads1256_read_cal_registers(ads1256_device_t device);
+bool ads1256_self_cal(ads1256_device_t device);
+bool ads1256_reset(ads1256_device_t device);
 
 #endif

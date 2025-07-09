@@ -377,7 +377,7 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 status register");
         return false;
     }
-    if(ads1256_set_value(MUX_REGISTER, MUX_REGISTER_SECOND_CHANNEL, device))
+    if(ads1256_set_value(MUX_REGISTER, MUX_REGISTER_FOURTH_CHANNEL, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 MUX register set successfully");
     }
