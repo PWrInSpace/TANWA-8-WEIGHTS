@@ -64,11 +64,13 @@ void ads1256_read_data_continuously(void*  pvParameters)
     ads1256_device_t* device = (ads1256_device_t*)pvParameters;
     uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
     int64_t start_time_us = esp_timer_get_time();
+    buffer_readc_index = 0;
+    readc_stop_flag = false;
 
     if(!xSemaphoreTake(current_mutex, portMAX_DELAY))
     {
         ESP_LOGE("ADS1256", "Failed to take mutex");
-        free(device);
+        // free(device);
         vTaskDelete(NULL);
         return;
     }
@@ -103,6 +105,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
         
                 xSemaphoreGive(readc_B_mutex);
                 xSemaphoreGive(buffer_B_ready);
+
                 current_mutex = readc_A_mutex;
                 current_sync = buffer_A_ready;
                 buffer_readc_current = buffer_readc_A;
@@ -111,23 +114,20 @@ void ads1256_read_data_continuously(void*  pvParameters)
             if(!xSemaphoreTake(current_mutex, portMAX_DELAY))
             {
                 ESP_LOGE("ADS1256", "Failed to take mutex after switching buffers");
-                free(device);
+                // free(device);
                 vTaskDelete(NULL);
                 return;
             }
         
             ESP_LOGI("ADS1256", "Switched to buffer %s", (current_mutex == readc_A_mutex) ? "A" : "B");
         }
-        
-
-        
 
     }
 
-    xSemaphoreGive(current_mutex); // Release the mutex before exiting
+    xSemaphoreGive(current_mutex);
 
 
-    free(device);
+    // free(device);
     vTaskDelete(NULL);
 
 }
@@ -150,17 +150,13 @@ void ads1256_start_readc(ads1256_device_t device)
     {
         ESP_LOGE("ADS1256", "Failed to start continuous read on ADS1256");
     }
-    else
-    {
-        ESP_LOGI("ADS1256", "Continuous read started on %s", ads1256_device_to_string(device));
-    }
 
     vTaskDelay(pdMS_TO_TICKS(1)); 
 
     gpio_set_level(device, 1); 
 
 
-    xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 4096, (void*)device_ptr, 10, &DRDY1_task);
+    xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 4096, NULL, 10, &DRDY1_task);
 
 
 }

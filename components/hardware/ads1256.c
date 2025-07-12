@@ -8,46 +8,34 @@
 
 TaskHandle_t DRDY1_task = NULL;
 TaskHandle_t DRDY2_task = NULL;
-QueueHandle_t ads1256_queue_1;
-
-/*
-ads_cal_reg map
-{OFC0, OFC1, OFC2, FSC0, FSC1, FSC2, zero_offset}
-*/
-const uint8_t ads_cal_reg[8][6] = { //TODO
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // DEVICE_1 first channel
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // DEVICE_1 second channel
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // DEVICE_1 third channel
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // DEVICE_1 fourth channel
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // DEVICE_2 first channel
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // DEVICE_2 second channel
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // DEVICE_2 third channel
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}  // DEVICE_2 fourth channel
+ads1256_channel_t ads1256_channels_dev1[4]  = {
+    {CHANNEL_1, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
+    {CHANNEL_2, 0, 1.0f, {0x9D, 0xF6, 0xFF}, {0x79, 0xBA, 0x49}},
+    {CHANNEL_3, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
+    {CHANNEL_4, 0, 1.0f, {0, 0, 0}, {0, 0, 0}}
 };
 
-const int32_t ads_cal_zero_offset[8] = 
-{
-    0, // DEVICE_1 first channel
-    0, // DEVICE_1 second channel
-    0, // DEVICE_1 third channel
-    0, // DEVICE_1 fourth channel
-    0, // DEVICE_2 first channel
-    0, // DEVICE_2 second channel
-    0, // DEVICE_2 third channel
-    0  // DEVICE_2 fourth channel
+ads1256_channel_t ads1256_channels_dev2[4] = {
+    {CHANNEL_1, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
+    {CHANNEL_2, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
+    {CHANNEL_3, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
+    {CHANNEL_4, 0, 1.0f, {0, 0, 0}, {0, 0, 0}}
 };
 
-const double ads_cal_factor[8] = 
-{
-    1.0f, // DEVICE_1 first channel
-    1.0f, // DEVICE_1 second channel
-    1.0f, // DEVICE_1 third channel
-    1.0f, // DEVICE_1 fourth channel
-    1.0f, // DEVICE_2 first channel
-    1.0f, // DEVICE_2 second channel
-    1.0f, // DEVICE_2 third channel
-    1.0f  // DEVICE_2 fourth channel
+ads1256_config_t ads1256_config_dev1 = {
+    .device = ADS1256_DEVICE_1,
+    .channels = ads1256_channels_dev1,
+    .active_channel = 2,
+    .sps = SPS_1000 
 };
+
+ads1256_config_t ads1256_config_dev2 = {
+    .device = ADS1256_DEVICE_2,
+    .channels = ads1256_channels_dev2,
+    .active_channel = 1,
+    .sps = SPS_1000 
+};
+
 
 char* ads1256_device_to_string(ads1256_device_t device) {
     switch (device) {
@@ -275,6 +263,55 @@ bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
 
 }
 
+bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value)
+{
+    if (sps_value != DATA_RATE_REGISTER_30000SPS && sps_value != DATA_RATE_REGISTER_15000SPS &&
+        sps_value != DATA_RATE_REGISTER_7500SPS && sps_value != DATA_RATE_REGISTER_3750SPS &&
+        sps_value != DATA_RATE_REGISTER_2000SPS && sps_value != DATA_RATE_REGISTER_1000SPS &&
+        sps_value != DATA_RATE_REGISTER_500SPS && sps_value != DATA_RATE_REGISTER_100SPS &&
+        sps_value != DATA_RATE_REGISTER_50SPS && sps_value != DATA_RATE_REGISTER_25SPS &&
+        sps_value != DATA_RATE_REGISTER_10SPS && sps_value != DATA_RATE_REGISTER_5SPS &&
+        sps_value != DATA_RATE_REGISTER_2P5SPS) {
+        ESP_LOGE(TAG, "Invalid SPS value: %d.", sps_value);
+        
+        return false;
+    }
+
+    bool result = ads1256_set_value(DATA_RATE_REGISTER, sps_value, device);
+    if (result) {
+        ESP_LOGI(TAG, "Data rate set to %d SPS on %s", sps_value, ads1256_device_to_string(device));
+    } else {
+        ESP_LOGE(TAG, "Failed to set data rate on %s", ads1256_device_to_string(device));
+    }
+    return result;
+}
+
+bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* OFC_REGISTER, const uint8_t* FSC_REGISTER)
+{
+    if (OFC_REGISTER == NULL || FSC_REGISTER == NULL) {
+        ESP_LOGE(TAG, "Invalid calibration registers");
+        return false;
+    }
+
+    bool result = true;
+
+    uint8_t tx[8] = {WREG_COMMAND | OFC0_REGISTER, 0x05, 
+                     OFC_REGISTER[0], OFC_REGISTER[1], OFC_REGISTER[2],
+                     FSC_REGISTER[0], FSC_REGISTER[1], FSC_REGISTER[2]};
+
+    gpio_set_level(device, 0);
+    result = result && _ads1256_spi_transmit(tx, sizeof(tx), NULL, 0);
+    esp_rom_delay_us(1);
+    gpio_set_level(device, 1);
+
+    if (result) {
+        ESP_LOGI(TAG, "Calibration registers set successfully on %s", ads1256_device_to_string(device));
+    } else {
+        ESP_LOGE(TAG, "Failed to set calibration registers on %s", ads1256_device_to_string(device));
+    }
+    return result;
+}
+
 bool ads1256_pins_init(void)
  {
     /*init lokalny gpio output*/
@@ -347,15 +384,11 @@ bool ads1256_pins_init(void)
 
 bool ads1256_init(ads1256_device_t device)
 {
-    if(ads1256_queue_1 == NULL)
-    {
-        ads1256_queue_1 = xQueueCreate(QUEUE_LENGTH, sizeof(ads1256_raw_data_sample_t));
-    }
-
-
-    if(!ads1256_read_cal_registers(device))
-    {
-        ESP_LOGE("ADS1256", "Failed to read calibration registers");
+    ads1256_config_t* config = NULL;
+    if (device == ADS1256_DEVICE_1) { config = &ads1256_config_dev1; }
+    else if (device == ADS1256_DEVICE_2) { config = &ads1256_config_dev2; }
+    else {
+        ESP_LOGE(TAG, "Invalid device: %s", ads1256_device_to_string(device));
         return false;
     }
 
@@ -377,15 +410,6 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 status register");
         return false;
     }
-    if(ads1256_set_value(MUX_REGISTER, MUX_REGISTER_FOURTH_CHANNEL, device))
-    {
-        ESP_LOGI("ADS1256", "ADS1256 MUX register set successfully");
-    }
-    else
-    {
-        ESP_LOGE("ADS1256", "Failed to set ADS1256 MUX register");
-        return false;
-    }
     if(ads1256_set_value(ADCON_REGISTER, ADCON_REGISTER_SETUP, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 ADCON register set successfully");
@@ -395,30 +419,34 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 ADCON register");
         return false;
     }
+    if(!ads1256_change_channel(device, config->channels[config->active_channel].channel_num))
+    {
+        ESP_LOGE("ADS1256", "Failed to change channel on %s", ads1256_device_to_string(device));
+        return false;
+    }
+    else
+    {
+        ESP_LOGI("ADS1256", "Channel changed to %d on %s", config->channels[config->active_channel].channel_num, ads1256_device_to_string(device));
+    }
+    if(!ads1256_set_sps(device, config->sps))
+    {
+        ESP_LOGE("ADS1256", "Failed to set SPS on %s", ads1256_device_to_string(device));
+        return false;
+    }
+    else
+    {
+        ESP_LOGI("ADS1256", "SPS set to %d on %s", config->sps, ads1256_device_to_string(device));
+    }
+    if(!ads1256_set_calibration_registers(device, config->channels[config->active_channel].OFC_REG, config->channels[config->active_channel].FSC_REG))
+    {
+        ESP_LOGE("ADS1256", "Failed to set calibration registers on %s", ads1256_device_to_string(device));
+        return false;
+    }
+    else
+    {
+        ESP_LOGI("ADS1256", "Calibration registers set successfully on %s", ads1256_device_to_string(device));
+    }
 
-    if(ads1256_set_value(DATA_RATE_REGISTER, DATA_RATE_REGISTER_7500SPS, device))
-    {
-        ESP_LOGI("ADS1256", "ADS1256 data rate register set successfully");
-    }
-    else
-    {
-        ESP_LOGE("ADS1256", "Failed to set ADS1256 data rate register");
-        return false;
-    }
-    if(ads1256_self_cal(device))
-    {
-        ESP_LOGI("ADS1256", "ADS1256 self-calibration completed successfully");
-    }
-    else
-    {
-        ESP_LOGE("ADS1256", "Failed to perform self-calibration on ADS1256");
-        return false;
-    }
-    if(!ads1256_read_cal_registers(device))
-    {
-        ESP_LOGE("ADS1256", "Failed to read calibration registers");
-        return false;
-    }
 
     return true;
 }

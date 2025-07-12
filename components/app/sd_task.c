@@ -46,7 +46,6 @@ bool print_file(const char* path) {
     
     uint8_t buf[64];
     size_t bytes_read;
-    int index = 0;
     
     while ((bytes_read = fread(buf, 1, sizeof(buf), f)) > 0) {
         printf("sd_data: ");
@@ -83,12 +82,12 @@ bool save_buffer_as_binary(const char* path, readc_frame_t* buffer, size_t lengt
     return true;
 }
 
-void save_buffer(readc_frame_t *buffer, size_t length) {
-    const char *test_filename = "/sdcard/dupa.txt";
+void save_buffer(const char* path, readc_frame_t *buffer, size_t length) {
+    ESP_LOGI(TAG, "Saving buffer to 4%s", path);
     if (sd_card.mounted) {
         ESP_LOGI(TAG, "SD card is mounted, saving data...");
-        if (save_buffer_as_binary(test_filename, buffer, length)) {
-            ESP_LOGI(TAG, "Data saved successfully to %s", test_filename);
+        if (save_buffer_as_binary(path, buffer, length)) {
+            ESP_LOGI(TAG, "Data saved successfully to %s", path);
         } else {
             ESP_LOGE(TAG, "Failed to save data to SD card");
         }
@@ -99,11 +98,19 @@ void save_buffer(readc_frame_t *buffer, size_t length) {
 
 void save_ads1256_buffor_task(void *arg)
 {
+    char* file_path = malloc(strlen(arg) + 1);
+    if (file_path == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for file_path");
+        vTaskDelete(NULL);
+        return;
+    }
+    strcpy(file_path, arg);
+    
     ESP_LOGI(TAG, "Starting SD card save task");
 
     while (!readc_stop_flag)
     {
-        if (xSemaphoreTake(buffer_A_ready, portMAX_DELAY))
+        if (xSemaphoreTake(buffer_A_ready, pdMS_TO_TICKS(5000)) == pdTRUE)
         {
             if(!xSemaphoreTake(readc_A_mutex, portMAX_DELAY))
             {
@@ -111,13 +118,15 @@ void save_ads1256_buffor_task(void *arg)
                 vTaskDelay(pdMS_TO_TICKS(1));
                 continue;
             }
-                ESP_LOGI(TAG, "readc_A_mutex taken successfully");
-
-            save_buffer(buffer_readc_A, BUFFER_READC_SAMPLES* sizeof(readc_frame_t));
+            ESP_LOGI(TAG, "readc_A_mutex taken successfully");
+            save_buffer(file_path, buffer_readc_A, BUFFER_READC_SAMPLES* sizeof(readc_frame_t));
 
             xSemaphoreGive(readc_A_mutex);
         }
-        if (xSemaphoreTake(buffer_B_ready, portMAX_DELAY) == pdTRUE)
+        else {
+            continue;
+        }
+        if (xSemaphoreTake(buffer_B_ready, pdMS_TO_TICKS(5000)) == pdTRUE)
         {
             if(!xSemaphoreTake(readc_B_mutex, portMAX_DELAY))
             {
@@ -127,9 +136,12 @@ void save_ads1256_buffor_task(void *arg)
             }
             ESP_LOGI(TAG, "readc_B_mutex taken successfully");
 
-            save_buffer(buffer_readc_B, BUFFER_READC_SAMPLES* sizeof(readc_frame_t));
+            save_buffer(file_path, buffer_readc_B, BUFFER_READC_SAMPLES* sizeof(readc_frame_t));
 
             xSemaphoreGive(readc_B_mutex);
+        }
+        else {
+            continue;
         }
     }
 
@@ -143,7 +155,7 @@ void save_ads1256_buffor_task(void *arg)
         }
         ESP_LOGI(TAG, "readc_A_mutex taken successfully");
 
-        save_buffer(buffer_readc_A, BUFFER_READC_SAMPLES* sizeof(readc_frame_t));
+        save_buffer(file_path, buffer_readc_A, BUFFER_READC_SAMPLES* sizeof(readc_frame_t));
 
 
         xSemaphoreGive(readc_A_mutex);
@@ -159,40 +171,45 @@ void save_ads1256_buffor_task(void *arg)
         }
         ESP_LOGI(TAG, "readc_B_mutex taken successfully");
 
-        save_buffer(buffer_readc_B, BUFFER_READC_SAMPLES* sizeof(readc_frame_t));
+        save_buffer(file_path, buffer_readc_B, BUFFER_READC_SAMPLES* sizeof(readc_frame_t));
 
         xSemaphoreGive(readc_B_mutex);
     }
 
     ESP_LOGI(TAG, "SD card save task completed");
+    free(file_path);
     vTaskDelete(NULL);
 
 }
 
-void test(void *arg)
-{
-    const char *test_filename = "/sdcard/dupa.txt";
-    const char *test_data = "Hello from ESP32 SD card! xddd";
-    const uint8_t tst[] = {0x01, 0x02, 0x03, 0x04, 0x05};
-    size_t data_len = strlen(test_data);
-    while (1)
-    {
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Opóźnienie dla stabilności
-        if (SD_write(&sd_card, test_filename, (const char *)tst, 5)) {
-            ESP_LOGI(TAG, "Data written successfully to %s", test_filename);
-        } else {
-            ESP_LOGE(TAG, "Failed to write data to %s", test_filename);
-        }
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Opóźnienie dla stabilności
-    }
-}
-
-void run_readc_sd_task(void)
+void run_readc_sd_task(const char* path)
 {
     ESP_LOGI("SD_TASK", "Starting SD card readc task");
-    xTaskCreatePinnedToCore(save_ads1256_buffor_task, "save_ads1256_buffor_task", 8192, NULL, 5, NULL, 1);
-}
-void run_test_task(void) {
-    ESP_LOGI("SD_TASK", "Starting SD card test task");
-    xTaskCreate(save_ads1256_buffor_task, "test_task", 8192, NULL, 5, NULL);
+
+    char *path_copy = strdup(path);
+    if (!path_copy) {
+        ESP_LOGE("SD_TASK", "Failed to allocate path copy");
+        return;
+    }
+
+    BaseType_t result = xTaskCreatePinnedToCore(
+        save_ads1256_buffor_task,
+        "save_ads1256_buffor_task",
+        8192,
+        (void*)path_copy,
+        5,
+        NULL,
+        1
+    );
+
+    if (result != pdPASS) {
+        ESP_LOGE("SD_TASK", "Failed to create save_ads1256_buffor_task");
+        free((void*)path);
+        return;
+    }
+
+    free((void*)path);
+
+
+
 }

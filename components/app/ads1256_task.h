@@ -6,10 +6,11 @@
 #include "ads1256.h"
 #include "mcu_spi_config.h"
 
-#define BUFFER_READC_SAMPLES 10000 //1 sample = 6 bytes
+/* ustawic BUFFER_READC_SAMPLES tak aby byl wypelniany w max 8 sek*/
+#define BUFFER_READC_SAMPLES 3000//1 sample = 6 bytes
 
 /*
-Kompilator twierdzi ze chce padding i mowi ze struktira ma 6 bajtow a nie 5
+Kompilator twierdzi ze chce padding do readc_frame_t i mowi ze struktira ma 6 bajtow a nie 5
 nie dodaje __attribute__((packed)) aby wymusic 5 bajtow bo to moze spowolnic dzialanie
 wiec wypelniam to dodatkowym bajtem aby nie bylo rozbierznosci w dzialaniu na roznych
 kompilatorach i architekturach

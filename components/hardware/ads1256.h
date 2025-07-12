@@ -88,6 +88,30 @@
 #define FSC2_REGISTER 0x0A // Full-scale calibration register 2
 
 
+typedef enum {
+    CHANNEL_1 = MUX_REGISTER_FIRST_CHANNEL,
+    CHANNEL_2 = MUX_REGISTER_SECOND_CHANNEL,
+    CHANNEL_3 = MUX_REGISTER_THIRD_CHANNEL,
+    CHANNEL_4 = MUX_REGISTER_FOURTH_CHANNEL
+} ads1256_channel_e;
+
+typedef enum 
+{
+    SPS_30000 = DATA_RATE_REGISTER_30000SPS,
+    SPS_15000 = DATA_RATE_REGISTER_15000SPS,
+    SPS_7500 = DATA_RATE_REGISTER_7500SPS,
+    SPS_3750 = DATA_RATE_REGISTER_3750SPS,
+    SPS_2000 = DATA_RATE_REGISTER_2000SPS,
+    SPS_1000 = DATA_RATE_REGISTER_1000SPS,
+    SPS_500 = DATA_RATE_REGISTER_500SPS,
+    SPS_100 = DATA_RATE_REGISTER_100SPS,
+    SPS_50 = DATA_RATE_REGISTER_50SPS,
+    SPS_25 = DATA_RATE_REGISTER_25SPS,
+    SPS_10 = DATA_RATE_REGISTER_10SPS,
+    SPS_5 = DATA_RATE_REGISTER_5SPS,
+    SPS_2P5 = DATA_RATE_REGISTER_2P5SPS
+} ads1256_sps_e;
+
 typedef enum ads1256_device_t
 {
     ADS1256_DEVICE_1 = CS_GPIO_1,
@@ -130,6 +154,24 @@ typedef struct ads1256_frame_t
     ads1256_data_t data_from_device;
 
 }ads1256_frame_t;
+
+typedef struct ads1256_channel_t
+{
+    ads1256_channel_e channel_num; // 1-4
+    int32_t zero_offset; // Zero offset for the channel
+    double factor; // Calibration factor for the channel    
+    uint8_t OFC_REG[3]; // Offset calibration registers
+    uint8_t FSC_REG[3]; // Full-scale calibration registers
+}ads1256_channel_t;
+
+typedef struct ads1256_config_t
+{
+    ads1256_device_t device; // Device identifier
+    ads1256_channel_t* channels; // Channels configuration
+    uint8_t active_channel;
+    ads1256_sps_e sps; // Samples per second setting
+} ads1256_config_t;    
+
 extern QueueHandle_t ads1256_queue_1;
 
 char* ads1256_device_to_string(ads1256_device_t device);
@@ -144,5 +186,6 @@ void ads1256_read_data_continuously_test_task(void);
 bool ads1256_read_cal_registers(ads1256_device_t device);
 bool ads1256_self_cal(ads1256_device_t device);
 bool ads1256_reset(ads1256_device_t device);
-
+bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value);
+bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* OFC_REGISTER, const uint8_t* FSC_REGISTER);
 #endif
