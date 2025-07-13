@@ -37,10 +37,10 @@
 
 #define STATUS_REGISTER_DEFAULT 0x00
 
-#define MUX_REGISTER_FIRST_CHANNEL 0x01 // AIN0+ AIN1-
-#define MUX_REGISTER_SECOND_CHANNEL 0x23 // AIN2+ AIN3- 
-#define MUX_REGISTER_THIRD_CHANNEL 0x45  // AIN4+ AIN5-
-#define MUX_REGISTER_FOURTH_CHANNEL 0x67 // AIN6+ AIN7-
+#define MUX_REGISTER_ZERO_CHANNEL 0x01 // AIN0+ AIN1-
+#define MUX_REGISTER_FIRST_CHANNEL 0x23 // AIN2+ AIN3- 
+#define MUX_REGISTER_SECOND_CHANNEL 0x45  // AIN4+ AIN5-
+#define MUX_REGISTER_THIRD_CHANNEL 0x67 // AIN6+ AIN7-
 
 #define ADCON_REGISTER_SETUP 0x06 // Gain = 64 (max output ~ 10mV) clck off debug off
 
@@ -89,10 +89,10 @@
 
 
 typedef enum {
+    CHANNEL_0 = MUX_REGISTER_ZERO_CHANNEL,
     CHANNEL_1 = MUX_REGISTER_FIRST_CHANNEL,
     CHANNEL_2 = MUX_REGISTER_SECOND_CHANNEL,
-    CHANNEL_3 = MUX_REGISTER_THIRD_CHANNEL,
-    CHANNEL_4 = MUX_REGISTER_FOURTH_CHANNEL
+    CHANNEL_3 = MUX_REGISTER_THIRD_CHANNEL
 } ads1256_channel_e;
 
 typedef enum 
@@ -129,31 +129,17 @@ extern TaskHandle_t DRDY2_task;
 
 typedef struct ads1256_raw_data_t
 {
+    uint8_t channel_0[3];
     uint8_t channel_1[3];
     uint8_t channel_2[3];
-    uint8_t channel_3[3];
-    uint8_t channel_4[3];
 }ads1256_raw_data_t;
 
-typedef struct ads1256_raw_data_sample_t //Used for queue in readc mode
+typedef struct ads1256_sig_data_t
 {
-    uint8_t data[3];
-}ads1256_raw_data_sample_t;
-
-typedef struct ads1256_data_t
-{
-    double channel_1;
-    double channel_2;
-    double channel_3;
-    double channel_4;
-}ads1256_data_t;
-
-typedef struct ads1256_frame_t
-{
-    uint8_t device_id;
-    ads1256_data_t data_from_device;
-
-}ads1256_frame_t;
+    int32_t channel_0;
+    int32_t channel_1;
+    int32_t channel_2;
+}ads1256_sig_data_t;
 
 typedef struct ads1256_channel_t
 {
@@ -181,11 +167,14 @@ bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data);
 bool ads1256_read_id(ads1256_device_t device);
 bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_pins_init(void);
-void ads1256_start_channel_task(ads1256_device_t device); //TODO do task
+void ads1256_raw_data_to_signed_value(uint8_t* data, int32_t* value);
+bool ads1256_sync(ads1256_device_t device);
+bool ads1256_wake_up(ads1256_device_t device);
 void ads1256_read_data_continuously_test_task(void);
 bool ads1256_read_cal_registers(ads1256_device_t device);
 bool ads1256_self_cal(ads1256_device_t device);
 bool ads1256_reset(ads1256_device_t device);
 bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value);
 bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* OFC_REGISTER, const uint8_t* FSC_REGISTER);
+void ads1256_raw_mux_data_to_single_weight(uint8_t* data, ads1256_device_t device, double* weight, uint8_t* channel_num, uint8_t channel_count);
 #endif

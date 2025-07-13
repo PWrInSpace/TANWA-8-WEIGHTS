@@ -33,6 +33,7 @@ extern SemaphoreHandle_t buffer_B_ready;
 
 bool ads1256_task_init(void);
 void ads1256_start_readc(ads1256_device_t device);
+void ads1256_start_channel_task(ads1256_device_t device);
 
 
 #endif

@@ -169,3 +169,53 @@ void ads1256_start_readc(ads1256_device_t device)
         // free(device_ptr); 
     }
 }
+
+
+void ads1256_data_from_channels(void*  pvParameters)
+{
+    ads1256_device_t* device = (ads1256_device_t*)pvParameters;
+    uint8_t data[3];
+    double weight;
+    uint8_t channel_num_order[3] = {3, 1, 2};
+
+    while (1)
+    {
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ads1256_change_channel(*device, 3);
+        ads1256_sync(*device);
+        ads1256_wake_up(*device);
+        ads1256_get_raw_data(*device, &data[0]);
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ads1256_change_channel(*device, 1);
+        ads1256_sync(*device);
+        ads1256_wake_up(*device);
+        ads1256_get_raw_data(*device, &data[1]);
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+        ads1256_change_channel(*device, 2);
+        ads1256_sync(*device);
+        ads1256_wake_up(*device);
+        ads1256_get_raw_data(*device, &data[2]);
+        ads1256_raw_mux_data_to_single_weight(data, *device, &weight, channel_num_order, 3);
+        ESP_LOGI("ADS1256", "Weight: %.2f g on %s", weight, ads1256_device_to_string(*device));
+        
+    }
+
+    free(device);
+    vTaskDelete(NULL);
+    
+}
+
+
+void ads1256_start_channel_task(ads1256_device_t device)
+{
+    ads1256_device_t* device_ptr = malloc(sizeof(ads1256_device_t));
+    if (device_ptr == NULL) {
+        ESP_LOGE("ADS1256", "Failed to allocate memory for device");
+        return;
+    }
+    *device_ptr = device;
+    xTaskCreate(ads1256_data_from_channels, "ads1256_task", 4096, (void*)device_ptr, 10, &DRDY1_task);
+}

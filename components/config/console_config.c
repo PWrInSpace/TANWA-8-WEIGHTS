@@ -25,19 +25,19 @@
 
 /* HELP FUNCs*/
 
-// char* add_sd_prefix(const char* path) {
-//     if (strncmp(path, "/sdcard/", 7) != 0) {
-//         char* file_path = malloc(strlen(MOUNT_POINT) + strlen(path) + 2); // +2 for '/' and '\0'
-//         if (!file_path) {
-//             ESP_LOGE(TAG, "Failed to allocate memory for file_path");
-//             return NULL;
-//         }
-//         snprintf(file_path, strlen(MOUNT_POINT) + strlen(path) + 2, "%s/%s", MOUNT_POINT, path);
-//         return file_path;
-//     } else {
-//         return strdup(path);
-//     }
-// }
+char* add_sd_prefix(const char* path) {
+    if (strncmp(path, "/sdcard/", 7) != 0) {
+        char* file_path = malloc(strlen(MOUNT_POINT) + strlen(path) + 2); // +2 for '/' and '\0'
+        if (!file_path) {
+            ESP_LOGE(TAG, "Failed to allocate memory for file_path");
+            return NULL;
+        }
+        snprintf(file_path, strlen(MOUNT_POINT) + strlen(path) + 2, "%s/%s", MOUNT_POINT, path);
+        return file_path;
+    } else {
+        return strdup(path);
+    }
+}
 
 /* HELP FUNCs*/
 
@@ -45,6 +45,41 @@ int reset_device(int argc, char **argv) {
     ESP_LOGI(TAG, "Resetting device...");
     esp_restart();
     return 0;
+}
+int read_mux_samples(int argc, char **argv) {
+    if(argc != 3)
+    {
+        ESP_LOGE(TAG, "Usage: command [dev_num] [time]");
+        return -1;
+    }
+
+    int device = atoi(argv[1]);
+    uint8_t time = atoi(argv[2]);
+    ads1256_device_t dev;
+
+    if(device == 1)
+    {
+        dev = ADS1256_DEVICE_1;
+    }
+    else if(device == 2)
+    {
+        dev = ADS1256_DEVICE_2;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+    if(time < 1)
+    {
+        ESP_LOGE(TAG, "Time value must be greater than 0");
+        return -1;
+    }
+    ESP_LOGI(TAG, "Starting read mux samples task from cmd (forever xd) on device %d", device);
+    ads1256_start_channel_task(dev);
+
+    return 0;
+
 }
 
 int readc_task(int argc, char **argv) {
@@ -84,54 +119,53 @@ int readc_task(int argc, char **argv) {
     return 0;
 }
 
-// int read_sd_file(int argc, char **argv) {
-//     if(argc != 2) {
-//         ESP_LOGE(TAG, "Usage: command [file_path]");
-//         return -1;
-//     }
-//     const char *file_path = add_sd_prefix(argv[1]);
-//     if (!print_file(file_path)) {
-//         ESP_LOGE(TAG, "Failed to read file: %s", file_path);
-//         free((void *)file_path);
-//         return -1;
-//     }
-//     free((void *)file_path);
-//     return 0;
-// }
+int read_sd_file(int argc, char **argv) {
+    if(argc != 2) {
+        ESP_LOGE(TAG, "Usage: command [file_path]");
+        return -1;
+    }
+    const char *file_path = add_sd_prefix(argv[1]);
+    if (!print_file(file_path)) {
+        ESP_LOGE(TAG, "Failed to read file: %s", file_path);
+        free((void *)file_path);
+        return -1;
+    }
+    free((void *)file_path);
+    return 0;
+}
 
-// int empty_sd_file(int argc, char **argv) {
-//     if(argc != 2) {
-//         ESP_LOGE(TAG, "Usage: command [file_path]");
-//         return -1;
-//     }
+int empty_sd_file(int argc, char **argv) {
+    if(argc != 2) {
+        ESP_LOGE(TAG, "Usage: command [file_path]");
+        return -1;
+    }
 
-//     const char *file_path = add_sd_prefix(argv[1]);
-//     if (empty_file(file_path)) {
-//         ESP_LOGI(TAG, "File emptied successfully at: %s", file_path);
-//     } else {
-//         ESP_LOGE(TAG, "Failed to empty file");
-//     }
-//     return 0;
-// }
+    const char *file_path = add_sd_prefix(argv[1]);
+    if (empty_file(file_path)) {
+        ESP_LOGI(TAG, "File emptied successfully at: %s", file_path);
+    } else {
+        ESP_LOGE(TAG, "Failed to empty file");
+    }
+    return 0;
+}
 
 int change_mux_channel(int argc, char **argv)
 {
     if(argc != 3)
     {
-        ESP_LOGE(TAG, "Usage: command [channel]");
+        ESP_LOGE(TAG, "Usage: command [dev_num] [channel] ");
         return -1;
     }
-    int channel = atoi(argv[1]);
-    int device_num = atoi(argv[2]);
+    int channel = atoi(argv[2]);
+    int device_num = atoi(argv[1]);
 
-    if(channel < 1 || channel > 4)
+    if(channel < 0 || channel > 3)
     {
-        ESP_LOGE(TAG, "Channel value must be between 1 and 4");
+        ESP_LOGE(TAG, "Channel value must be between 0 and 3");
         return -1;
     }
 
     ads1256_device_t dev;
-    uint8_t channel_hex;
 
 
     if(device_num == 1)
@@ -148,16 +182,7 @@ int change_mux_channel(int argc, char **argv)
         return -1;
     }
 
-    switch(channel)
-    {
-        case 1: channel_hex = MUX_REGISTER_FIRST_CHANNEL; break;
-        case 2: channel_hex = MUX_REGISTER_SECOND_CHANNEL; break;
-        case 3: channel_hex = MUX_REGISTER_THIRD_CHANNEL; break;
-        case 4: channel_hex = MUX_REGISTER_FOURTH_CHANNEL; break;
-        default: ESP_LOGE(TAG, "Unknow channel value"); return -1;
-    }
-
-    if(!ads1256_change_channel(dev, channel_hex))
+    if(!ads1256_change_channel(dev, channel))
     {
         ESP_LOGE(TAG, "Channel change error");
         return -1;
@@ -392,8 +417,8 @@ int help_cmd(int argc, char **argv);
  // cmd     help description   hint  function      args
  {"reset", "Reset the device", NULL, reset_device, NULL},
  {"ads_readc", "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task, NULL},
-// {"sd_read_file", "Print file on std out from sd. Usage: sd_read_file [file_path]", NULL, read_sd_file, NULL},
-// {"sd_clear_file", "Empty a file on the SD card. Usage: sd_clear_file [file_path]", NULL, empty_sd_file, NULL},
+{"sd_read_file", "Print file on std out from sd. Usage: sd_read_file [file_path]", NULL, read_sd_file, NULL},
+{"sd_clear_file", "Empty a file on the SD card. Usage: sd_clear_file [file_path]", NULL, empty_sd_file, NULL},
 {"ads_samples", "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]", NULL,ads1256_get_sampes, NULL },
 {"ads_change_mux", "Change ads channel. Usage: ads_change_mux [dev_num] [1-4]", NULL, change_mux_channel, NULL},
 {"ads_read_cal", "Read calibration registers. Usage: ads_read_cal", NULL, read_cal_registers, NULL},
@@ -401,6 +426,8 @@ int help_cmd(int argc, char **argv);
 {"ads_reset", "Reset ads device. Usage: ads_reset [dev_num]", NULL, ads1256_reset_cli,NULL},
 {"ads_set_sps", "Set data rate for ads device. Usage: ads_set_sps [dev_num] [sps_value]", NULL, ads1256_set_sps_cmd, NULL},
 {"help", "Display this help message", NULL, help_cmd, NULL},
+{"read_mux_samples", "Read samples from the ADS1256 MUX. Usage: read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples, NULL},
+
 };
 
 int help_cmd(int argc, char **argv) {

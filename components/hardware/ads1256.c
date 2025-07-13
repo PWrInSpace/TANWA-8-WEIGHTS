@@ -9,17 +9,17 @@
 TaskHandle_t DRDY1_task = NULL;
 TaskHandle_t DRDY2_task = NULL;
 ads1256_channel_t ads1256_channels_dev1[4]  = {
-    {CHANNEL_1, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
-    {CHANNEL_2, 0, 1.0f, {0x9D, 0xF6, 0xFF}, {0x79, 0xBA, 0x49}},
-    {CHANNEL_3, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
-    {CHANNEL_4, 0, 1.0f, {0, 0, 0}, {0, 0, 0}}
+    {CHANNEL_0, 0, 1.0f, {0x3B, 0xF1, 0xFF}, {0x0A, 0x2E, 0x2F}},
+    {CHANNEL_1, 0, 1.0f, {0x9D, 0xF6, 0xFF}, {0x79, 0xBA, 0x49}},
+    {CHANNEL_2, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
+    {CHANNEL_3, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}}
 };
 
 ads1256_channel_t ads1256_channels_dev2[4] = {
+    {CHANNEL_0, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
     {CHANNEL_1, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
     {CHANNEL_2, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
-    {CHANNEL_3, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
-    {CHANNEL_4, 0, 1.0f, {0, 0, 0}, {0, 0, 0}}
+    {CHANNEL_3, 0, 1.0f, {0, 0, 0}, {0, 0, 0}}
 };
 
 
@@ -28,7 +28,7 @@ ads1256_config_t ads1256_config_dev1 = {
     .device = ADS1256_DEVICE_1,
     .channels = ads1256_channels_dev1,
     .active_channel = 1,
-    .sps = SPS_1000 
+    .sps = SPS_10
 };
 
 ads1256_config_t ads1256_config_dev2 = {
@@ -252,14 +252,18 @@ bool ads1256_sync(ads1256_device_t device)
 
 bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
 {
-    if (channel != MUX_REGISTER_FIRST_CHANNEL && channel != MUX_REGISTER_SECOND_CHANNEL && channel != MUX_REGISTER_THIRD_CHANNEL && channel != MUX_REGISTER_FOURTH_CHANNEL) {
-        ESP_LOGE(TAG, "Invalid channel: %d", channel);
+    if( channel > 3) {
+        ESP_LOGE(TAG, "Invalid channel number: %d. Must be between 0 and 3.", channel);
         return false;
     }
 
+    ads1256_config_t *config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
+
+
     bool result = ads1256_set_value(MUX_REGISTER, channel, device);
 
-    //TODO: add here update of cal registers 
+    result = result && ads1256_set_calibration_registers(device, config->channels[channel].OFC_REG, config->channels[channel].FSC_REG);
+    if(result) { config->active_channel = channel;}
     return result;
 
 
@@ -306,9 +310,7 @@ bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* O
     esp_rom_delay_us(1);
     gpio_set_level(device, 1);
 
-    if (result) {
-        ESP_LOGI(TAG, "Calibration registers set successfully on %s", ads1256_device_to_string(device));
-    } else {
+    if (!result) {
         ESP_LOGE(TAG, "Failed to set calibration registers on %s", ads1256_device_to_string(device));
     }
     return result;
@@ -421,7 +423,7 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 ADCON register");
         return false;
     }
-    if(!ads1256_change_channel(device, config->channels[config->active_channel].channel_num))
+    if(!ads1256_change_channel(device, config->active_channel))
     {
         ESP_LOGE("ADS1256", "Failed to change channel on %s", ads1256_device_to_string(device));
         return false;
@@ -438,15 +440,6 @@ bool ads1256_init(ads1256_device_t device)
     else
     {
         ESP_LOGI("ADS1256", "SPS set to %d on %s", config->sps, ads1256_device_to_string(device));
-    }
-    if(!ads1256_set_calibration_registers(device, config->channels[config->active_channel].OFC_REG, config->channels[config->active_channel].FSC_REG))
-    {
-        ESP_LOGE("ADS1256", "Failed to set calibration registers on %s", ads1256_device_to_string(device));
-        return false;
-    }
-    else
-    {
-        ESP_LOGI("ADS1256", "Calibration registers set successfully on %s", ads1256_device_to_string(device));
     }
 
 
@@ -524,141 +517,48 @@ bool ads1256_read_id(ads1256_device_t device)
     return true;
 }
 
-
-void ads1256_read_data_continuouslyy(void*  pvParameters)  //!FOR TESTING PURPOSES!
+void ads1256_raw_data_to_signed_value(uint8_t* data, int32_t* value)
 {
-    ads1256_device_t* device = (ads1256_device_t*)pvParameters;
-    ads1256_raw_data_t data;
-    uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
-    int32_t value = 0;
-    int32_t zero_offset = 0;
-    //-6230 - 2000 -> -6230/2000 -> 3.115 to 1g
-
-    /* counting average of measurments */
-    int64_t sum = 0;
-    uint16_t counter = 0;
-    /* counting average of measurments */
-    double grams = 0.0f;
-    //petla for do debuga
-    // while (1)
-
-    for(int i = 0; i < 30000*10 ; i++) 
-    {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        gpio_set_level(*device, 0);
-        if(!_ads1256_spi_transmit(dummy_data, sizeof(dummy_data), data.channel_1, sizeof(data.channel_1)))
-        {
-            ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
-        }
-        gpio_set_level(*device, 1);
-
-        value = (data.channel_1[0] << 16) | (data.channel_1[1] << 8) | data.channel_1[2];
-        if (value & 0x800000) {
-            value |= 0xFF000000;
-        }
-        value -= zero_offset; // Adjusting the value with zero offset
-        ESP_LOGI("ADS1256", "Raw value: %d on %s", value, ads1256_device_to_string(*device));
-        grams = (double)value / -3.115; 
-        // ESP_LOGI("ADS1256", "Raw sign value: %d on %s", value, ads1256_device_to_string(device));
-            // -4470
-        // value_buffer[(buffer_index++)%BUFFER_SIZE] = grams;
-
-        // ESP_LOGI("ADS1256", "Weight %.4f grams on %s", grams, ads1256_device_to_string(*device));
-        
-
-        /* counting average of measurments */
-        counter ++;
-        sum += value;
-        // ESP_LOGI("ADS1256", "Average value after %d reads: %lld on %s", counter, sum / counter, ads1256_device_to_string(device));
-        /* counting average of measurments */
-
-
-    }
-
-
-    // for (size_t i = 0; i < buffer_index; i++) {
-    //     ESP_LOGI("ADS1256", "Buffered value[%d]: %.4f", i, value_buffer[i]);
-    //     vTaskDelay(pdMS_TO_TICKS(10)); // Spowolnienie wypisywania
-    // }
-    free(device);
-    vTaskDelete(NULL);
-}
-
-void ads1256_read_data_continuously_test_task(void)
-{
-
-    uint8_t tx_data = RDATAC_COMMAND;
-
-    ads1256_device_t* device_ptr = malloc(sizeof(ads1256_device_t));
-    if (device_ptr == NULL) {
-        ESP_LOGE("ADS1256", "Failed to allocate memory for device");
+    if (data == NULL || value == NULL) {
+        ESP_LOGE(TAG, "Invalid data or value pointer");
         return;
     }
-    *device_ptr = ADS1256_DEVICE_1; // Set the device to ADS1256_DEVICE_1
 
-    gpio_set_level(*device_ptr, 0); 
-    if(ads1256_single_transmit(*device_ptr, &tx_data, sizeof(tx_data)) == false)
-    {
-        ESP_LOGE("ADS1256", "Failed to start continuous read on ADS1256");
+    *value = (data[0] << 16) | (data[1] << 8) | data[2];
+    if (*value & 0x800000) {
+        *value |= 0xFF000000; // sign-extend if negative
     }
-    else
-    {
-        ESP_LOGI("ADS1256", "Continuous read started on %s", ads1256_device_to_string(*device_ptr));
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(1)); 
-
-    gpio_set_level(*device_ptr, 1);
-
-
-    xTaskCreate(ads1256_read_data_continuouslyy, "ads1256_task", 4096, (void*)device_ptr, 10, &DRDY1_task);
 }
-
-
-
-void ads1256_data_from_channels(void*  pvParameters)
+void ads1256_raw_data_to_weight(uint8_t* data, ads1256_device_t device, double* weight, uint8_t charnel_num)
 {
-    vTaskDelay(pdMS_TO_TICKS(1000)); 
-
-    ads1256_device_t* device = (ads1256_device_t*)pvParameters;
-    ads1256_raw_data_t data;
-
-    while (1)
-    {
-
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel(*device, MUX_REGISTER_FIRST_CHANNEL);
-        ads1256_sync(*device);
-        ads1256_wake_up(*device);
-        ads1256_get_raw_data(*device, data.channel_1);
-
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel(*device, MUX_REGISTER_SECOND_CHANNEL);
-        ads1256_sync(*device);
-        ads1256_wake_up(*device);
-        ads1256_get_raw_data(*device, data.channel_2);
-
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
-        ads1256_change_channel(*device, MUX_REGISTER_THIRD_CHANNEL);
-        ads1256_sync(*device);
-        ads1256_wake_up(*device);
-        ads1256_get_raw_data(*device, data.channel_3);
-
-    }
-
-    free(device);
-    vTaskDelete(NULL);
-    
-}
-
-
-void ads1256_start_channel_task(ads1256_device_t device)
-{
-    ads1256_device_t* device_ptr = malloc(sizeof(ads1256_device_t));
-    if (device_ptr == NULL) {
-        ESP_LOGE("ADS1256", "Failed to allocate memory for device");
+    if (data == NULL || weight == NULL) {
+        ESP_LOGE(TAG, "Invalid data or weight pointer");
         return;
     }
-    *device_ptr = device;
-    xTaskCreate(ads1256_data_from_channels, "ads1256_task", 4096, (void*)device_ptr, 10, &DRDY1_task);
+
+    int32_t raw_value;
+    ads1256_raw_data_to_signed_value(data, &raw_value);
+    ads1256_config_t* config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
+    ads1256_channel_t *channel = &config->channels[charnel_num];
+
+    int32_t diff = raw_value - channel->zero_offset;
+    *weight = (double)diff / channel->factor;
+}
+
+void ads1256_raw_mux_data_to_single_weight(uint8_t* data, ads1256_device_t device, double* weight, uint8_t* channel_num, uint8_t channel_count)
+{
+    if (data == NULL || weight == NULL || channel_num == NULL || channel_count == 0) {
+        ESP_LOGE(TAG, "Invalid data, weight, channel_num or channel_count pointer");
+        return;
+    }
+
+    double weight_tab[channel_count];
+
+    ads1256_config_t* config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
+
+    for (int i = 0; i < channel_count; i++) {
+        ads1256_raw_data_to_weight(&data[i], device, &weight_tab[i], channel_num[i]);
+        *weight += weight_tab[i];
+    }
+    *weight /= channel_count;
 }
