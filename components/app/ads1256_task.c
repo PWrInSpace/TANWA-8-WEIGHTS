@@ -4,6 +4,7 @@
 #include "esp_heap_caps.h"
 #include "ads1256_task.h"
 #include "esp_timer.h"
+#include "sd_task.h"
 
 volatile bool readc_stop_flag = false;
 readc_frame_t* buffer_readc_A;
@@ -61,10 +62,17 @@ bool ads1256_task_init(void)
 
 void ads1256_read_data_continuously(void*  pvParameters)
 {
+
+    ESP_LOGI("ADS1256", "Starting continuous read task for device 15");
+
     ads1256_device_t* device = (ads1256_device_t*)pvParameters;
     uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
     int64_t start_time_us = esp_timer_get_time();
     buffer_readc_index = 0;
+    buffer_readc_current = buffer_readc_A;
+    current_mutex = readc_A_mutex;
+    current_sync = buffer_A_ready;
+
     readc_stop_flag = false;
 
     if(!xSemaphoreTake(current_mutex, portMAX_DELAY))
@@ -118,6 +126,8 @@ void ads1256_read_data_continuously(void*  pvParameters)
                 vTaskDelete(NULL);
                 return;
             }
+
+            xTaskNotifyGive(sd_task);
         
             ESP_LOGI("ADS1256", "Switched to buffer %s", (current_mutex == readc_A_mutex) ? "A" : "B");
         }
@@ -126,8 +136,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
 
     xSemaphoreGive(current_mutex);
 
-
-    // free(device);
+    new_filename_flag = true; 
     vTaskDelete(NULL);
 
 }
@@ -155,8 +164,8 @@ void ads1256_start_readc(ads1256_device_t device)
 
     gpio_set_level(device, 1); 
 
-
-    xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 4096, NULL, 10, &DRDY1_task);
-
-
+    if (xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 8192, (void*)device_ptr, 10, &DRDY1_task) != pdPASS) {
+        ESP_LOGE("ADS1256", "Failed to create ADS1256 read task");
+        // free(device_ptr); 
+    }
 }

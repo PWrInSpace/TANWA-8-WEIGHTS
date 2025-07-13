@@ -25,19 +25,19 @@
 
 /* HELP FUNCs*/
 
-char* add_sd_prefix(const char* path) {
-    if (strncmp(path, "/sdcard/", 7) != 0) {
-        char* file_path = malloc(strlen(MOUNT_POINT) + strlen(path) + 2); // +2 for '/' and '\0'
-        if (!file_path) {
-            ESP_LOGE(TAG, "Failed to allocate memory for file_path");
-            return NULL;
-        }
-        snprintf(file_path, strlen(MOUNT_POINT) + strlen(path) + 2, "%s/%s", MOUNT_POINT, path);
-        return file_path;
-    } else {
-        return strdup(path);
-    }
-}
+// char* add_sd_prefix(const char* path) {
+//     if (strncmp(path, "/sdcard/", 7) != 0) {
+//         char* file_path = malloc(strlen(MOUNT_POINT) + strlen(path) + 2); // +2 for '/' and '\0'
+//         if (!file_path) {
+//             ESP_LOGE(TAG, "Failed to allocate memory for file_path");
+//             return NULL;
+//         }
+//         snprintf(file_path, strlen(MOUNT_POINT) + strlen(path) + 2, "%s/%s", MOUNT_POINT, path);
+//         return file_path;
+//     } else {
+//         return strdup(path);
+//     }
+// }
 
 /* HELP FUNCs*/
 
@@ -48,9 +48,9 @@ int reset_device(int argc, char **argv) {
 }
 
 int readc_task(int argc, char **argv) {
-    if(argc != 4)
+    if(argc != 3)
     {
-        ESP_LOGE(TAG, "Usage: command [dev_num] [time] [path]");
+        ESP_LOGE(TAG, "Usage: command [dev_num] [time]");
         return -1;
     }
     int device = atoi(argv[1]);
@@ -77,42 +77,42 @@ int readc_task(int argc, char **argv) {
         ESP_LOGE(TAG, "Time value must be greater than 0");
         return -1;
     }
-        char *path = add_sd_prefix(argv[3]);
+        // char *path = add_sd_prefix(argv[3]);
     ESP_LOGI(TAG, "Starting readc task from cmd");
 
-    start_readc_task(dev, time, path);
+    start_readc_task(dev, time);
     return 0;
 }
 
-int read_sd_file(int argc, char **argv) {
-    if(argc != 2) {
-        ESP_LOGE(TAG, "Usage: command [file_path]");
-        return -1;
-    }
-    const char *file_path = add_sd_prefix(argv[1]);
-    if (!print_file(file_path)) {
-        ESP_LOGE(TAG, "Failed to read file: %s", file_path);
-        free((void *)file_path);
-        return -1;
-    }
-    free((void *)file_path);
-    return 0;
-}
+// int read_sd_file(int argc, char **argv) {
+//     if(argc != 2) {
+//         ESP_LOGE(TAG, "Usage: command [file_path]");
+//         return -1;
+//     }
+//     const char *file_path = add_sd_prefix(argv[1]);
+//     if (!print_file(file_path)) {
+//         ESP_LOGE(TAG, "Failed to read file: %s", file_path);
+//         free((void *)file_path);
+//         return -1;
+//     }
+//     free((void *)file_path);
+//     return 0;
+// }
 
-int empty_sd_file(int argc, char **argv) {
-    if(argc != 2) {
-        ESP_LOGE(TAG, "Usage: command [file_path]");
-        return -1;
-    }
+// int empty_sd_file(int argc, char **argv) {
+//     if(argc != 2) {
+//         ESP_LOGE(TAG, "Usage: command [file_path]");
+//         return -1;
+//     }
 
-    const char *file_path = add_sd_prefix(argv[1]);
-    if (empty_file(file_path)) {
-        ESP_LOGI(TAG, "File emptied successfully at: %s", file_path);
-    } else {
-        ESP_LOGE(TAG, "Failed to empty file");
-    }
-    return 0;
-}
+//     const char *file_path = add_sd_prefix(argv[1]);
+//     if (empty_file(file_path)) {
+//         ESP_LOGI(TAG, "File emptied successfully at: %s", file_path);
+//     } else {
+//         ESP_LOGE(TAG, "Failed to empty file");
+//     }
+//     return 0;
+// }
 
 int change_mux_channel(int argc, char **argv)
 {
@@ -392,8 +392,8 @@ int help_cmd(int argc, char **argv);
  // cmd     help description   hint  function      args
  {"reset", "Reset the device", NULL, reset_device, NULL},
  {"ads_readc", "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task, NULL},
-{"sd_read_file", "Print file on std out from sd. Usage: sd_read_file [file_path]", NULL, read_sd_file, NULL},
-{"sd_clear_file", "Empty a file on the SD card. Usage: sd_clear_file [file_path]", NULL, empty_sd_file, NULL},
+// {"sd_read_file", "Print file on std out from sd. Usage: sd_read_file [file_path]", NULL, read_sd_file, NULL},
+// {"sd_clear_file", "Empty a file on the SD card. Usage: sd_clear_file [file_path]", NULL, empty_sd_file, NULL},
 {"ads_samples", "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]", NULL,ads1256_get_sampes, NULL },
 {"ads_change_mux", "Change ads channel. Usage: ads_change_mux [dev_num] [1-4]", NULL, change_mux_channel, NULL},
 {"ads_read_cal", "Read calibration registers. Usage: ads_read_cal", NULL, read_cal_registers, NULL},

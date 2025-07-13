@@ -10,6 +10,7 @@
 #include "mcu_gpio_config.h"
 #include "sd_task.h"
 #include "ads1256_task.h"
+#include "app_task.h"
 #define TAG "APP"
 
 extern board_config_t config;
@@ -26,9 +27,11 @@ void app_main(void) {
     }
 
     //hamownia channel 2 na ads cs=15 cfg
-    uint8_t tst[3] = {0x9D, 0xF6, 0xFF};
-    uint8_t tst2[3] = {0x79, 0xBA, 0x49};
-    ads1256_set_calibration_registers(ADS1256_DEVICE_1, tst, tst2);
+    // uint8_t tst[3] = {0x9D, 0xF6, 0xFF};
+    // uint8_t tst2[3] = {0x79, 0xBA, 0x49};
+    // ads1256_set_calibration_registers(ADS1256_DEVICE_1, tst, tst2);
+
+
 
     // ads1256_read_data_continuously_test_task(); // Start the ADS1256 read data task for testing purposes
 }

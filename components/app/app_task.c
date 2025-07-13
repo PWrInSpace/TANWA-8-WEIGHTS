@@ -38,11 +38,10 @@ esp_err_t app_task_deinit(void) {
 }
 
     
-void start_readc_task(ads1256_device_t dev ,uint8_t time, char *path) {
-    ESP_LOGI("APP_TASK", "Starting readc task");
+void start_readc_task(ads1256_device_t dev ,uint8_t time) {
+
 
     ads1256_start_readc(dev);
-    run_readc_sd_task(path);
 
     ESP_LOGI("APP_TASK", "Readc task started");
 

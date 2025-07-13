@@ -7,7 +7,7 @@
 #include "mcu_spi_config.h"
 
 /* ustawic BUFFER_READC_SAMPLES tak aby byl wypelniany w max 8 sek*/
-#define BUFFER_READC_SAMPLES 3000//1 sample = 6 bytes
+#define BUFFER_READC_SAMPLES 1500//1 sample = 6 bytes
 
 /*
 Kompilator twierdzi ze chce padding do readc_frame_t i mowi ze struktira ma 6 bajtow a nie 5

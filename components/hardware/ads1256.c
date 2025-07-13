@@ -22,17 +22,19 @@ ads1256_channel_t ads1256_channels_dev2[4] = {
     {CHANNEL_4, 0, 1.0f, {0, 0, 0}, {0, 0, 0}}
 };
 
+
+// Active channels = active channel - 1 
 ads1256_config_t ads1256_config_dev1 = {
     .device = ADS1256_DEVICE_1,
     .channels = ads1256_channels_dev1,
-    .active_channel = 2,
+    .active_channel = 1,
     .sps = SPS_1000 
 };
 
 ads1256_config_t ads1256_config_dev2 = {
     .device = ADS1256_DEVICE_2,
     .channels = ads1256_channels_dev2,
-    .active_channel = 1,
+    .active_channel = 0,
     .sps = SPS_1000 
 };
 
