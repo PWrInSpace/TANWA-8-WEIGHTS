@@ -11,19 +11,12 @@
 #define TAG "MCU_GPIO"
 
 static mcu_gpio_config_t mcu_gpio_config = {
-    .pins = {LED_GPIO, ADS1256_1_CS_GPIO},
+    .pins = {LED_GPIO},
     .num_pins = MAX_GPIO_INDEX,
     .configs = {
         {
             .pin_bit_mask = (1ULL << LED_GPIO),
             .mode = GPIO_MODE_OUTPUT_OD,
-            .pull_up_en = GPIO_PULLUP_DISABLE,
-            .pull_down_en = GPIO_PULLDOWN_DISABLE,
-            .intr_type = GPIO_INTR_DISABLE,
-        },
-        {
-            .pin_bit_mask = (1ULL << ADS1256_1_CS_GPIO),
-            .mode = GPIO_MODE_INPUT,
             .pull_up_en = GPIO_PULLUP_DISABLE,
             .pull_down_en = GPIO_PULLDOWN_DISABLE,
             .intr_type = GPIO_INTR_DISABLE,
@@ -54,8 +47,6 @@ esp_err_t mcu_gpio_init() {
 }
 
 bool _mcu_gpio_set_level(uint8_t gpio, uint8_t level) {
-    // ESP_LOGI(TAG, "Setting GPIO pin %d to %d", mcu_gpio_config.pins[gpio], level);
-    // ESP_LOGI(TAG, "GPIO pin %d", CONFIG_SPI_CS_A);
     return gpio_set_level(mcu_gpio_config.pins[gpio], level) == ESP_OK ? true : false;
 }
 

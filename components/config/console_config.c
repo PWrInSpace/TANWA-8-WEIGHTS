@@ -232,17 +232,26 @@ int ads1256_get_sampes(int argc, char **argv)
 
     for(int i =0; i<samples; i++)
     {
-        if(!ads1256_get_raw_data(dev, data))
-        {
-            return -1;
-        }
-        value = (data[0] << 16) | (data[1] << 8) | data[2];
+        // if(!ads1256_get_raw_data(dev, data))
+        // {
+        //     return -1;
+        // }
+        // value = (data[0] << 16) | (data[1] << 8) | data[2];
 
-        if (value & 0x800000) {
-            value |= 0xFF000000;
-        }
+        // if (value & 0x800000) {
+        //     value |= 0xFF000000;
+        // }
 
-        ESP_LOGI(TAG, "Raw signed value: %d", value);
+        // ESP_LOGI(TAG, "Raw signed value: %d", value);
+        float weight = 0.0f;
+        uint8_t raw_data;
+        ads1256_get_raw_data(ADS1256_DEVICE_1, &raw_data);
+        ads1256_raw_data_to_weight(&raw_data, ADS1256_DEVICE_1, &weight, 1);
+        // ESP_LOGI("CAN_COMMANDS", "Weight from device %d [N], channel %d: %f", ads_device, channel_num, weight);
+        ESP_LOGI("CLI","waga w [n]: %f", weight );
+        // uint8_t resp[4];
+        // memcpy(resp, &weight, sizeof(weight));
+        // esp_err_t err = can_send_message(0x3F20, resp, sizeof(resp));
 
         vTaskDelay(pdMS_TO_TICKS(1000));
     }

@@ -1,21 +1,14 @@
 #ifndef PWRINSPACE_CAN_COMMANDS_H
 #define PWRINSPACE_CAN_COMMANDS_H
 
+#include "esp_err.h"
+
 /** PLACE YOUR CAN CALLBACKS AND CAN MESSAGES HERE IN FORMAT*/
 typedef enum {
-    CAN_TEMPLATE_MESSAGE_ID = 0xFF,
- /*    CAN_MSG_ID_1 = ...,
- *     CAN_MSG_ID_2 = ...,
- *     CAN_MSG_ID_3 = ...,
- *     CAN_MSG_ID_4 = ...,
- *     CAN_MSG_ID_5 = ...,
- */
+    START_READC_TASK_ID = 0x0FD0,
+    GET_ADS_SINGLE_CHANNEL_WEIGHT_ID = 0x2F80,
 } can_message_id_t;
 
-/*PLACE YOUR FUNCTIONS ACCORDING TO THE TEMPLATE
-* typedef esp_err_t (*can_command_handler_t)(uint8_t *data, uint8_t length);
-* 
-* REGISTER THEM IN can_config.c FILE
-*/
-
+esp_err_t start_readc_command_handler(uint8_t *data, uint8_t length);
+esp_err_t get_ads_single_channel_weight(uint8_t *data, uint8_t length);
 #endif //PWRINSPACE_CAN_COMMANDS_H

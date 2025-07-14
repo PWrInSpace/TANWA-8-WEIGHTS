@@ -10,7 +10,7 @@ TaskHandle_t DRDY1_task = NULL;
 TaskHandle_t DRDY2_task = NULL;
 ads1256_channel_t ads1256_channels_dev1[4]  = {
     {CHANNEL_0, 0, 1.0f, {0x3B, 0xF1, 0xFF}, {0x0A, 0x2E, 0x2F}},
-    {CHANNEL_1, 0, 1.0f, {0x9D, 0xF6, 0xFF}, {0x79, 0xBA, 0x49}},
+    {CHANNEL_1, 1935, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
     {CHANNEL_2, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
     {CHANNEL_3, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}}
 };
@@ -23,12 +23,11 @@ ads1256_channel_t ads1256_channels_dev2[4] = {
 };
 
 
-// Active channels = active channel - 1 
 ads1256_config_t ads1256_config_dev1 = {
     .device = ADS1256_DEVICE_1,
     .channels = ads1256_channels_dev1,
     .active_channel = 1,
-    .sps = SPS_10
+    .sps = SPS_1000
 };
 
 ads1256_config_t ads1256_config_dev2 = {
@@ -260,7 +259,7 @@ bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
     ads1256_config_t *config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
 
 
-    bool result = ads1256_set_value(MUX_REGISTER, channel, device);
+    bool result = ads1256_set_value(MUX_REGISTER, config->channels[channel].channel_num, device);
 
     result = result && ads1256_set_calibration_registers(device, config->channels[channel].OFC_REG, config->channels[channel].FSC_REG);
     if(result) { config->active_channel = channel;}
@@ -341,7 +340,7 @@ bool ads1256_pins_init(void)
     }
 
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_1, 1));  
-    ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 1)); 
+    ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 0)); 
     ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_1, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 0)); 
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_1, 1)); 
@@ -529,7 +528,7 @@ void ads1256_raw_data_to_signed_value(uint8_t* data, int32_t* value)
         *value |= 0xFF000000; // sign-extend if negative
     }
 }
-void ads1256_raw_data_to_weight(uint8_t* data, ads1256_device_t device, double* weight, uint8_t charnel_num)
+void ads1256_raw_data_to_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t charnel_num)
 {
     if (data == NULL || weight == NULL) {
         ESP_LOGE(TAG, "Invalid data or weight pointer");
@@ -542,19 +541,19 @@ void ads1256_raw_data_to_weight(uint8_t* data, ads1256_device_t device, double* 
     ads1256_channel_t *channel = &config->channels[charnel_num];
 
     int32_t diff = raw_value - channel->zero_offset;
-    *weight = (double)diff / channel->factor;
+    *weight = (float)diff / channel->factor;
 }
 
-void ads1256_raw_mux_data_to_single_weight(uint8_t* data, ads1256_device_t device, double* weight, uint8_t* channel_num, uint8_t channel_count)
+void ads1256_raw_mux_data_to_single_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t* channel_num, uint8_t channel_count)
 {
     if (data == NULL || weight == NULL || channel_num == NULL || channel_count == 0) {
         ESP_LOGE(TAG, "Invalid data, weight, channel_num or channel_count pointer");
         return;
     }
 
-    double weight_tab[channel_count];
+    float weight_tab[channel_count];
 
-    ads1256_config_t* config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
+    // ads1256_config_t* config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
 
     for (int i = 0; i < channel_count; i++) {
         ads1256_raw_data_to_weight(&data[i], device, &weight_tab[i], channel_num[i]);

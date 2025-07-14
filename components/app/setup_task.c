@@ -13,6 +13,8 @@
 #include "sd_task.h"
 #include "ads1256_task.h"
 #include "timers_config.h"
+#include "can_config.h"
+#include "mcu_twai_config.h"
 
 #define SETUP_TASK_STACK_SIZE CONFIG_SETUP_TASK_STACK_SIZE
 #define SETUP_TASK_PRIORITY CONFIG_SETUP_TASK_PRIORITY
@@ -43,47 +45,8 @@ void setup_task(void *arg) {
 }
 
 esp_err_t setup_task_init(void) {
-    if(mcu_spi_init() != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize MCU SPI");
-        return ESP_FAIL;
-    }
-    else {
-        ESP_LOGI(TAG, "MCU SPI initialized successfully");
-    }
 
-    if(_ads1256_add_device() != true) {
-        ESP_LOGE(TAG, "Failed to add ADS1256 device");
-        return ESP_FAIL;
-    }
-    else {
-        ESP_LOGI(TAG, "ADS1256 device added successfully");
-    }
 
-    if(sd_task_init() != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize SD task");
-        return ESP_FAIL;
-    }
-    else {
-        ESP_LOGI(TAG, "SD task initialized successfully");
-    }
-
-    if(!timers_init())
-    {
-        ESP_LOGE(TAG, "Failed to initialize timers");
-        return ESP_FAIL;
-    }
-    else {
-        ESP_LOGI(TAG, "Timers initialized successfully");
-    }
-
-    if(!ads1256_task_init())
-    {
-        ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
-        return ESP_FAIL;
-    }
-    else {
-        ESP_LOGI(TAG, "ADS1256 task initialized successfully");
-    }
     // Create the setup task
     if(xTaskCreatePinnedToCore(setup_task, "setup_task", SETUP_TASK_STACK_SIZE, NULL, SETUP_TASK_PRIORITY, &setup_task_handle, SETUP_TASK_CORE_ID) == pdPASS) {
         ESP_LOGI(TAG, "Setup task created successfully");

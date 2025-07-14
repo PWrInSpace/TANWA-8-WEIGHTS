@@ -11,7 +11,11 @@
 
 can_command_t can_commands[] = {
     // Example command registration
-    //{CAN_TEMPLATE_MESSAGE_ID, example_command_handler},
+    // {CAN_TEMPLATE_MESSAGE_ID, example_command_handler},
+    {START_READC_TASK_ID, start_readc_command_handler},
+    {GET_ADS_SINGLE_CHANNEL_WEIGHT_ID, get_ads_single_channel_weight},
+
+
     // Add your CAN commands here
 };
 

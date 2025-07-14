@@ -24,6 +24,14 @@
 #include "can_config.h"
 #include "console_config.h"
 
+#include "mcu_spi_config.h"
+#include "ads1256.h"
+#include "sd_task.h"
+#include "ads1256_task.h"
+#include "timers_config.h"
+#include "ads1256_task.h"
+
+
 #define TAG "BOARD_CONFIG"
 
 void _led_delay(uint32_t _ms) {
@@ -45,26 +53,24 @@ esp_err_t board_config_init(void) {
 
     esp_err_t err;
     
-    // err = mcu_gpio_init();
+    err = mcu_gpio_init();
 
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(TAG, "GPIO initialization failed");
-    //     return err;
-    // }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "GPIO initialization failed");
+        return err;
+    }
 
-    // err = mcu_twai_init();
+    err = mcu_twai_init();
 
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(TAG, "TWAI initialization failed");
-    //     return err;
-    // }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "TWAI initialization failed");
+    }
 
-    // err = can_config_init();
+    err = can_config_init();
 
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(TAG, "CAN initialization failed");
-    //     return err;
-    // }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "CAN initialization failed");
+    }
 
     err = console_config_init();
 
@@ -72,6 +78,38 @@ esp_err_t board_config_init(void) {
         ESP_LOGE(TAG, "Console initialization failed");
         return err;
     }
+
+    err = mcu_spi_init();
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "SPI initialization failed");
+        return err;
+    }
+
+    if(_ads1256_add_device() != true) {
+        ESP_LOGE(TAG, "Failed to add ADS1256 device");
+        return ESP_FAIL;
+    }
+
+    err = sd_task_init();
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "SD task initialization failed");
+        return err;
+    }
+
+    if(!timers_init())
+    {
+        ESP_LOGE(TAG, "Failed to initialize timers");
+        return ESP_FAIL;
+    }
+
+    if(!ads1256_task_init())
+    {
+        ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
+        return ESP_FAIL;
+    }
+    
     return ESP_OK;
 
     //*********** ADD HARDWARE CONFIGURATION HERE ***********//

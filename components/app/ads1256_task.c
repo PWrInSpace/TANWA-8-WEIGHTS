@@ -65,7 +65,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
 
     ESP_LOGI("ADS1256", "Starting continuous read task for device 15");
 
-    ads1256_device_t* device = (ads1256_device_t*)pvParameters;
+    // ads1256_device_t* device = (ads1256_device_t*)pvParameters;
     uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
     int64_t start_time_us = esp_timer_get_time();
     buffer_readc_index = 0;
@@ -175,7 +175,7 @@ void ads1256_data_from_channels(void*  pvParameters)
 {
     ads1256_device_t* device = (ads1256_device_t*)pvParameters;
     uint8_t data[3];
-    double weight;
+    float weight;
     uint8_t channel_num_order[3] = {3, 1, 2};
 
     while (1)

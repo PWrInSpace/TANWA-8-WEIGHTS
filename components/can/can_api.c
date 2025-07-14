@@ -63,6 +63,7 @@ esp_err_t can_send_message(uint32_t id, uint8_t *data, uint8_t length) {
     // Prepare the message
     message.identifier = id;
     message.data_length_code = length;
+    message.extd = 1;
     memcpy(message.data, data, length);
 
     // Send the message
@@ -108,11 +109,14 @@ void can_task(void *arg) {
 
     while (1) {
         // Receive a message
+        // ESP_LOGI(TAG, "Waiting for CAN message...");
         err = twai_receive(&message, pdMS_TO_TICKS(10));
         if (err == ESP_OK) {
+
             // Process the received message
             for (size_t i = 0; i < gb.num_commands; i++) {
                 if (gb.commands[i].message_id == message.identifier) {
+                    // ESP_LOGI(TAG, "Received CAN message with ID: 0x%X", message.identifier);
                     gb.commands[i].handler(message.data, message.data_length_code);
                     break;
                 }

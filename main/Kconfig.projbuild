@@ -83,13 +83,13 @@ menu "TANWA BOARD CONFIGURATION"
 
         config CAN_RX_GPIO
             int "TWAI RX PIN"
-            default 21
+            default 19
             help
                 GPIO number for TWAI RX pin.
         
         config CAN_TX_GPIO
             int "CAN TX PIN"
-            default 22
+            default 20
             help
                 GPIO number for TWAI TX pin.
 

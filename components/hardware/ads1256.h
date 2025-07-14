@@ -12,7 +12,7 @@
 
 
 #define CS_GPIO_1 15 //TODO: zabrac z configu GPIO
-#define CS_GPIO_2 7
+#define CS_GPIO_2 8 //drut TODO usunac
 #define RESET_GPIO_1 17
 #define RESET_GPIO_2 36
 #define PWDN_GPIO_1 16
@@ -143,7 +143,7 @@ typedef struct ads1256_sig_data_t
 
 typedef struct ads1256_channel_t
 {
-    ads1256_channel_e channel_num; // 1-4
+    ads1256_channel_e channel_num; // hexadecimal channel number
     int32_t zero_offset; // Zero offset for the channel
     double factor; // Calibration factor for the channel    
     uint8_t OFC_REG[3]; // Offset calibration registers
@@ -176,5 +176,6 @@ bool ads1256_self_cal(ads1256_device_t device);
 bool ads1256_reset(ads1256_device_t device);
 bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value);
 bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* OFC_REGISTER, const uint8_t* FSC_REGISTER);
-void ads1256_raw_mux_data_to_single_weight(uint8_t* data, ads1256_device_t device, double* weight, uint8_t* channel_num, uint8_t channel_count);
+void ads1256_raw_mux_data_to_single_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t* channel_num, uint8_t channel_count);
+void ads1256_raw_data_to_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t charnel_num);
 #endif
