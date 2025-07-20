@@ -25,6 +25,28 @@ static struct {
     TaskHandle_t task_handle;
 } gb;
 
+esp_err_t can_pins_init(void) {
+    esp_err_t err;
+
+        gpio_config_t io_conf = {
+            .mode = GPIO_MODE_OUTPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+        };
+    
+        gpio_num_t output_pins[] = {
+            CAN_STB_GPIO,
+        };
+    
+        for (int i = 0; i < sizeof(output_pins)/sizeof(output_pins[0]); i++) {
+            io_conf.pin_bit_mask = 1ULL << output_pins[i];
+            gpio_config(&io_conf);
+        }
+        ESP_ERROR_CHECK(gpio_set_level(CAN_STB_GPIO, 0)); 
+    
+        return ESP_OK;
+}
 esp_err_t can_start(void) {
     esp_err_t err;
 
@@ -34,6 +56,8 @@ esp_err_t can_start(void) {
         ESP_LOGE(TAG, "Failed to start TWAI driver: %s", esp_err_to_name(err));
         return err;
     }
+
+    can_pins_init();
 
     return ESP_OK;
 }

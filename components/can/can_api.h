@@ -6,6 +6,8 @@
 
 #include "can_commands.h"
 
+#define CAN_STB_GPIO 8
+
 typedef esp_err_t (*can_command_handler_t)(uint8_t *data, uint8_t length);
 
 typedef struct {
