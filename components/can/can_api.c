@@ -26,7 +26,6 @@ static struct {
 } gb;
 
 esp_err_t can_pins_init(void) {
-    esp_err_t err;
 
         gpio_config_t io_conf = {
             .mode = GPIO_MODE_OUTPUT,

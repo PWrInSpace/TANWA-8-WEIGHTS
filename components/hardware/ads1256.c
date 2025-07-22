@@ -530,6 +530,7 @@ void ads1256_raw_data_to_signed_value(uint8_t* data, int32_t* value)
 }
 void ads1256_raw_data_to_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t charnel_num)
 {
+    //TODO channel num nie zzmienia channelu, tylko bierze jego kalibracje (raw z aktualnego channelu)
     if (data == NULL || weight == NULL) {
         ESP_LOGE(TAG, "Invalid data or weight pointer");
         return;
