@@ -246,9 +246,9 @@ int ads1256_get_sampes(int argc, char **argv)
         float weight = 0.0f;
         uint8_t raw_data;
         ads1256_get_raw_data(ADS1256_DEVICE_1, &raw_data);
-        ads1256_raw_data_to_weight(&raw_data, ADS1256_DEVICE_1, &weight, 1);
+        // ads1256_raw_data_to_weight(&raw_data, ADS1256_DEVICE_1, &weight, 1);
         // ESP_LOGI("CAN_COMMANDS", "Weight from device %d [N], channel %d: %f", ads_device, channel_num, weight);
-        ESP_LOGI("CLI","waga w [n]: %f", weight );
+        // ESP_LOGI("CLI","waga w [n]: %f", weight );
         // uint8_t resp[4];
         // memcpy(resp, &weight, sizeof(weight));
         // esp_err_t err = can_send_message(0x3F20, resp, sizeof(resp));
@@ -256,6 +256,35 @@ int ads1256_get_sampes(int argc, char **argv)
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
+    return 0;
+}
+
+int dev_info(int argc, char **argv)
+{
+    if(argc != 2)
+    {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+
+    if(device == 1)
+    {
+        dev = ADS1256_DEVICE_1;
+    }
+    else if(device == 2)
+    {
+        dev = ADS1256_DEVICE_2;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+
+    ads1256_get_config_info(dev);
     return 0;
 }
 
@@ -417,7 +446,32 @@ int ads1256_set_sps_cmd(int argc, char **argv)
 
     return 1;
 }
+
+int print_data(int argc, char **argv) {
+    if(argc != 2) {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+
+    if(device == 1) {
+        dev = ADS1256_DEVICE_1;
+    } else if(device == 2) {
+        dev = ADS1256_DEVICE_2;
+    } else {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+
+    ads1256_print_data(dev);
+    return 0;
+}
+
 int help_cmd(int argc, char **argv);
+
+
 
  // Place for the console configuration
 
@@ -434,8 +488,12 @@ int help_cmd(int argc, char **argv);
 {"ads_calibrate", "Calibrate device on current channel. Usage: ads_calibrate [dev_num]", NULL, calibrate_device, NULL},
 {"ads_reset", "Reset ads device. Usage: ads_reset [dev_num]", NULL, ads1256_reset_cli,NULL},
 {"ads_set_sps", "Set data rate for ads device. Usage: ads_set_sps [dev_num] [sps_value]", NULL, ads1256_set_sps_cmd, NULL},
-{"help", "Display this help message", NULL, help_cmd, NULL},
 {"read_mux_samples", "Read samples from the ADS1256 MUX. Usage: read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples, NULL},
+{"dev_info", "Display device configuration information. Usage: dev_info [dev_num]", NULL, dev_info, NULL},
+{"ads_print_data", "Print data from ADS1256 device. Usage: ads_print_data [dev_num]", NULL, print_data, NULL},
+{"help", "Display this help message", NULL, help_cmd, NULL},
+
+
 
 };
 

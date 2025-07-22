@@ -72,13 +72,20 @@ esp_err_t mcu_spi_deinit(void);
 
 bool _ads1256_add_device(void);  
 
+typedef struct ads1256_spi_transmit_t
+{
+  const uint8_t* tx_data;  
+  size_t tx_len;            
+  uint8_t cs_pin; 
+} ads1256_spi_transmit_t;
+
 /**
- * \brief SPI transmit function for AD7190
- * \param[in] tx_data input buffer
- * \param[in] tx_len length of input buffer
+ * \brief SPI transmit function for ADS1256
+ * \param[in] ads1256_spi_transmit_t structure
  * \param[out] rx_data output buffer
  * \param[in] rx_len length of output buffer
  */
-bool _ads1256_spi_transmit(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_data, size_t rx_len);
+bool _ads1256_spi_transmit(ads1256_spi_transmit_t* ads_transmit, uint8_t* rx_data, size_t rx_len);
+
 bool _ads1256_spi_transmit_queued(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_data, size_t rx_len);
 #endif /* PWRINSPACE_MCU_SPI_CONFIG_H_ */

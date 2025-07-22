@@ -22,6 +22,7 @@ typedef struct readc_frame_t {
 } readc_frame_t;
 
 extern volatile bool readc_stop_flag;
+
 extern readc_frame_t* buffer_readc_A;
 extern readc_frame_t* buffer_readc_B;
 extern SemaphoreHandle_t readc_A_mutex;

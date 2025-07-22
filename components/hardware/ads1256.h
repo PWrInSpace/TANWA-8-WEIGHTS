@@ -5,11 +5,7 @@
 #include <stdbool.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
-#include "freertos/queue.h"
-
-#define QUEUE_LENGTH 20
-
+#include "freertos/semphr.h"
 
 #define CS_GPIO_1 15 //TODO: zabrac z configu GPIO
 #define CS_GPIO_2 7 
@@ -103,34 +99,15 @@ typedef enum ads1256_device_t
     ADS1256_DEVICE_2 = CS_GPIO_2
 } ads1256_device_t;
 
-/*
-{OFC0, OFC1, OFC2, FSC0, FSC1, FSC2, zero_offset}
-*/
-extern const uint8_t ads_cal_reg[8][6];
-extern const int32_t ads_cal_zero_offset[8];
-extern const double ads_cal_factor[8];
 extern TaskHandle_t DRDY1_task;
 extern TaskHandle_t DRDY2_task;
 
-typedef struct ads1256_raw_data_t
-{
-    uint8_t channel_0[3];
-    uint8_t channel_1[3];
-    uint8_t channel_2[3];
-}ads1256_raw_data_t;
-
-typedef struct ads1256_sig_data_t
-{
-    int32_t channel_0;
-    int32_t channel_1;
-    int32_t channel_2;
-}ads1256_sig_data_t;
 
 typedef struct ads1256_channel_t
 {
-    ads1256_channel_e channel_num; // hexadecimal channel number
+    ads1256_channel_e channel_hex; // hexadecimal channel number
     int32_t zero_offset; // Zero offset for the channel
-    double factor; // Calibration factor for the channel    
+    float factor; // Calibration factor for the channel    
     uint8_t OFC_REG[3]; // Offset calibration registers
     uint8_t FSC_REG[3]; // Full-scale calibration registers
 }ads1256_channel_t;
@@ -143,24 +120,37 @@ typedef struct ads1256_config_t
     ads1256_sps_e sps; // Samples per second setting
 } ads1256_config_t;    
 
-extern QueueHandle_t ads1256_queue_1;
 
-char* ads1256_device_to_string(ads1256_device_t device);
-bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length);
+typedef struct ads1256_data_t
+{
+    float weight[4]; 
+} ads1256_data_t;
+
+extern SemaphoreHandle_t data_dev1_mutex;
+extern SemaphoreHandle_t data_dev2_mutex;
+
+extern ads1256_data_t ads1256_data_dev1;
+extern ads1256_data_t ads1256_data_dev2;
+
+int ads1256_device_to_number(ads1256_device_t device);
+
 bool ads1256_init(ads1256_device_t device);
-bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data);
-bool ads1256_read_id(ads1256_device_t device);
-bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_pins_init(void);
-void ads1256_raw_data_to_signed_value(uint8_t* data, int32_t* value);
+bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length);
+bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data);
+bool ads1256_read_id(ads1256_device_t device, uint8_t* id);
+bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_sync(ads1256_device_t device);
 bool ads1256_wake_up(ads1256_device_t device);
-void ads1256_read_data_continuously_test_task(void);
 bool ads1256_read_cal_registers(ads1256_device_t device);
 bool ads1256_self_cal(ads1256_device_t device);
 bool ads1256_reset(ads1256_device_t device);
 bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value);
 bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* OFC_REGISTER, const uint8_t* FSC_REGISTER);
-void ads1256_raw_mux_data_to_single_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t* channel_num, uint8_t channel_count);
-void ads1256_raw_data_to_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t charnel_num);
+bool ads1256_change_channel_and_read(ads1256_device_t device, uint8_t channel, float* value);
+bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value, uint8_t channel_num);
+
+void ads1256_get_config_info(ads1256_device_t device);
+void ads1256_update_data_struct(ads1256_device_t device, ads1256_data_t* data);
+void ads1256_print_data(ads1256_device_t device);
 #endif

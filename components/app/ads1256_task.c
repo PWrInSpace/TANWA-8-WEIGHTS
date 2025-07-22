@@ -174,32 +174,24 @@ void ads1256_start_readc(ads1256_device_t device)
 void ads1256_data_from_channels(void*  pvParameters)
 {
     ads1256_device_t* device = (ads1256_device_t*)pvParameters;
-    uint8_t data[3];
-    float weight;
-    uint8_t channel_num_order[3] = {3, 1, 2};
+    ads1256_data_t data = {{0.0f, 0.0f, 0.0f, 0.0f}};
 
     while (1)
     {
 
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel(*device, 3);
-        ads1256_sync(*device);
-        ads1256_wake_up(*device);
-        ads1256_get_raw_data(*device, &data[0]);
+        ads1256_change_channel_and_read(*device, 0, &data.weight[0]);
 
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel(*device, 1);
-        ads1256_sync(*device);
-        ads1256_wake_up(*device);
-        ads1256_get_raw_data(*device, &data[1]);
+        ads1256_change_channel_and_read(*device, 1, &data.weight[1]);
 
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
-        ads1256_change_channel(*device, 2);
-        ads1256_sync(*device);
-        ads1256_wake_up(*device);
-        ads1256_get_raw_data(*device, &data[2]);
-        ads1256_raw_mux_data_to_single_weight(data, *device, &weight, channel_num_order, 3);
-        ESP_LOGI("ADS1256", "Weight: %.2f g on %s", weight, ads1256_device_to_string(*device));
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ads1256_change_channel_and_read(*device, 2, &data.weight[2]);
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ads1256_change_channel_and_read(*device, 3, &data.weight[3]);
+
+        ads1256_update_data_struct(*device, &data);
         
     }
 
@@ -217,5 +209,5 @@ void ads1256_start_channel_task(ads1256_device_t device)
         return;
     }
     *device_ptr = device;
-    xTaskCreate(ads1256_data_from_channels, "ads1256_task", 4096, (void*)device_ptr, 10, &DRDY1_task);
+    xTaskCreate(ads1256_data_from_channels, "ads1256_channel_task", 4096, (void*)device_ptr, 10, &DRDY1_task);
 }

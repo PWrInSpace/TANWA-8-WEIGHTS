@@ -3,11 +3,16 @@
 #include "mcu_gpio_config.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include <string.h>
 
 #define TAG "ads1256"
 
 TaskHandle_t DRDY1_task = NULL;
 TaskHandle_t DRDY2_task = NULL;
+
+SemaphoreHandle_t data_dev1_mutex = NULL;
+SemaphoreHandle_t data_dev2_mutex = NULL;
+
 ads1256_channel_t ads1256_channels_dev1[4]  = {
     {CHANNEL_0, 0, 1.0f, {0x3B, 0xF1, 0xFF}, {0x0A, 0x2E, 0x2F}},
     {CHANNEL_1, 1935, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
@@ -16,10 +21,10 @@ ads1256_channel_t ads1256_channels_dev1[4]  = {
 };
 
 ads1256_channel_t ads1256_channels_dev2[4] = {
-    {CHANNEL_0, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
-    {CHANNEL_1, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
-    {CHANNEL_2, 0, 1.0f, {0, 0, 0}, {0, 0, 0}},
-    {CHANNEL_3, 0, 1.0f, {0, 0, 0}, {0, 0, 0}}
+    {CHANNEL_0, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
+    {CHANNEL_1, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
+    {CHANNEL_2, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
+    {CHANNEL_3, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}}
 };
 
 
@@ -37,16 +42,136 @@ ads1256_config_t ads1256_config_dev2 = {
     .sps = SPS_1000 
 };
 
+ads1256_data_t ads1256_data_dev1;
+ads1256_data_t ads1256_data_dev2;
 
-char* ads1256_device_to_string(ads1256_device_t device) {
+bool get_channel_config(ads1256_config_t* config, ads1256_channel_t* channel_config, uint8_t channel_num) {
+    if (channel_config == NULL || channel_num > 3) {
+        ESP_LOGE(TAG, "Invalid channel configuration or channel number");
+        return false;
+    }
+
+    *channel_config = config->channels[channel_num];
+    return true;
+}
+
+bool get_zero_offset_calibration(ads1256_channel_t* channel_config , int32_t* zero_offset)
+{
+
+    if(channel_config == NULL || zero_offset == NULL) {
+        ESP_LOGE(TAG, "Invalid channel configuration or zero offset pointer");
+        return false;
+    }
+
+    *zero_offset = channel_config->zero_offset;
+
+    return true;
+
+}
+
+bool set_zero_offset_calibration(ads1256_channel_t* channel_config, int32_t zero_offset)
+{
+    if(channel_config == NULL) {
+        ESP_LOGE(TAG, "Invalid channel configuration pointer");
+        return false;
+    }
+
+    channel_config->zero_offset = zero_offset;
+
+    return true;
+}
+
+bool get_factor_calibration(ads1256_channel_t* channel_config, float* factor)
+{
+    if(channel_config == NULL || factor == NULL) {
+        ESP_LOGE(TAG, "Invalid channel configuration or factor pointer");
+        return false;
+    }
+
+    *factor = channel_config->factor;
+
+    return true;
+}
+
+bool get_hex_channel_num(ads1256_channel_t* channel_config, uint8_t* channel_num)
+{
+    if(channel_config == NULL || channel_num == NULL) {
+        ESP_LOGE(TAG, "Invalid channel configuration or channel number pointer");
+        return false;
+    }
+
+    *channel_num = channel_config->channel_hex;
+
+    return true;
+}
+
+bool get_active_channel(ads1256_config_t* config, uint8_t* active_channel)
+{
+    if(config == NULL || active_channel == NULL) {
+        ESP_LOGE(TAG, "Invalid configuration or active channel pointer");
+        return false;
+    }
+
+    *active_channel = config->active_channel;
+
+    return true;
+}
+
+int ads1256_device_to_number(ads1256_device_t device) {
     switch (device) {
         case ADS1256_DEVICE_1:
-            return "ADS1256_DEVICE_1";
+            return 1;
         case ADS1256_DEVICE_2:
-            return "ADS1256_DEVICE_2";
+            return 2;
         default:
-            return "UNKNOWN_DEVICE";
+            return -1;
     }
+}
+
+int ads1256_sps_hex_to_value(ads1256_sps_e sps) {
+    switch (sps) {
+        case DATA_RATE_REGISTER_30000SPS:
+            return 30000;
+        case DATA_RATE_REGISTER_15000SPS:
+            return 15000;
+        case DATA_RATE_REGISTER_7500SPS:
+            return 7500;
+        case DATA_RATE_REGISTER_3750SPS:
+            return 3750;
+        case DATA_RATE_REGISTER_2000SPS:
+            return 2000;
+        case DATA_RATE_REGISTER_1000SPS:
+            return 1000;
+        case DATA_RATE_REGISTER_500SPS:
+            return 500;
+        case DATA_RATE_REGISTER_100SPS:
+            return 100;
+        case DATA_RATE_REGISTER_50SPS:
+            return 50;
+        case DATA_RATE_REGISTER_25SPS:
+            return 25;
+        case DATA_RATE_REGISTER_10SPS:
+            return 10;
+        case DATA_RATE_REGISTER_5SPS:
+            return 5;
+        case DATA_RATE_REGISTER_2P5SPS:
+            return 205;
+        default:
+            ESP_LOGE(TAG, "Invalid SPS value");
+            return -1;
+    }
+}
+
+bool valid_and_set_dev_config(ads1256_device_t device, ads1256_config_t* config) {
+    if (device == ADS1256_DEVICE_1) {
+        *config = ads1256_config_dev1;
+    } else if (device == ADS1256_DEVICE_2) {
+        *config = ads1256_config_dev2;
+    } else {
+        ESP_LOGE(TAG, "Invalid device number: %d", device);
+        return false;
+    }
+    return true;
 }
 
 bool install_isr_service()
@@ -59,69 +184,56 @@ bool install_isr_service()
     return true; 
 }
 
-bool rdy_gpio1_attach_isr(void (*handler)(void*), void* arg) {
-    esp_err_t res = gpio_isr_handler_add(DRDY_GPIO_1, handler, arg);
-    if (res != ESP_OK) {
-        ESP_LOGE("ISR", "Failed to attach ISR to DRDY_GPIO_1!");
+bool rdy_gpio_attach_isr(void (*handler)(void*), void* arg) {
+    uint8_t ads_dev = (uint8_t)(uintptr_t)arg;
+    uint8_t drdy_gpio;
+    if(ads_dev == ADS1256_DEVICE_1) {
+        drdy_gpio = DRDY_GPIO_1;
+    } else if(ads_dev == ADS1256_DEVICE_2) {
+        drdy_gpio = DRDY_GPIO_2;
+    } else {
+        ESP_LOGE("ISR", "Invalid GPIO number for ADS1256 device");
         return false;
     }
 
-    ESP_LOGI("ISR", "ISR attached to DRDY_GPIO_1");
+    esp_err_t res = gpio_isr_handler_add(drdy_gpio, handler, arg);
+    if (res != ESP_OK) {
+        ESP_LOGE("ISR", "Failed to attach ISR to %d GPIO", drdy_gpio);
+        return false;
+    }
+
+    ESP_LOGI("ISR", "ISR attached to GPIO %d for device %d", drdy_gpio, ads1256_device_to_number(ads_dev));
     return true;
 }
 
-bool rdy_gpio2_attach_isr(void (*handler)(void*), void* arg) {
-    esp_err_t res = gpio_isr_handler_add(DRDY_GPIO_2, handler, arg);
-    if (res != ESP_OK) {
-        ESP_LOGE("ISR", "Failed to attach ISR to DRDY_GPIO_2!");
+void IRAM_ATTR gpio_isr_handler(void* arg) {
+    ads1256_device_t device = (ads1256_device_t)arg;
+    TaskHandle_t DRDY_task = (device == ADS1256_DEVICE_1) ? DRDY1_task : DRDY2_task;
+    if (DRDY_task == NULL) {
+        return;
+    }
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xTaskNotifyFromISR(DRDY_task, 0, eNoAction, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+bool setup_isr() {
+    if(!rdy_gpio_attach_isr(gpio_isr_handler, (void*)ADS1256_DEVICE_1))
+    {
+        ESP_LOGI(TAG, "GPIO ISR setup failed for device %d", ads1256_device_to_number(ADS1256_DEVICE_1));
         return false;
     }
 
-    ESP_LOGI("ISR", "ISR attached to DRDY_GPIO_2");
+    if(!rdy_gpio_attach_isr(gpio_isr_handler, (void*)ADS1256_DEVICE_2))
+    {
+        ESP_LOGI(TAG, "GPIO ISR setup failed for device %d", ads1256_device_to_number(ADS1256_DEVICE_2));
+        return false;
+    }
+
     return true;
 }
 
-void IRAM_ATTR gpio1_isr_handler(void* arg) {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    if (DRDY1_task != NULL) {
-        xTaskNotifyFromISR(DRDY1_task, 0, eNoAction, &xHigherPriorityTaskWoken);
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-    }
-}
-
-void IRAM_ATTR gpio2_isr_handler(void* arg) {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    if (DRDY2_task != NULL) {
-        xTaskNotifyFromISR(DRDY2_task, 0, eNoAction, &xHigherPriorityTaskWoken);
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-    }
-}
-
-bool setup_isr1() {
-    if(rdy_gpio1_attach_isr(gpio1_isr_handler, NULL))
-    {
-        ESP_LOGI(TAG, "GPIO ISR setup successful");
-        return true;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "GPIO ISR setup failed");
-        return false;
-    }
-}
-
-bool setup_isr2() {
-    if(rdy_gpio2_attach_isr(gpio2_isr_handler, NULL))
-    {
-        ESP_LOGI(TAG, "GPIO ISR setup successful");
-        return true;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "GPIO ISR setup failed");
-        return false;
-    }
-}
 
 bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length)
 {
@@ -130,7 +242,13 @@ bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, si
         return false;
     }
 
-    if(!_ads1256_spi_transmit(tx_data, tx_length, NULL, 0)) {
+    ads1256_spi_transmit_t ads_transmit = {
+        .tx_data = tx_data,
+        .tx_len = tx_length,
+        .cs_pin = (device == ADS1256_DEVICE_1) ? CS_GPIO_1 : CS_GPIO_2,
+    };
+
+    if(!_ads1256_spi_transmit(&ads_transmit, NULL, 0)) {
         ESP_LOGE(TAG, "Failed to transmit data to ADS1256");
         return false;
     }
@@ -140,60 +258,57 @@ bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, si
 
 bool ads1256_set_value(uint8_t register_address, uint8_t value, ads1256_device_t device)
 {
-    bool res = true;
     uint8_t tx[3] = {WREG_COMMAND | register_address, 0x00, value};
-
-    gpio_set_level(device,0);
-    res = res && _ads1256_spi_transmit(tx, sizeof(tx), NULL, 0);
+    bool res = ads1256_single_transmit(device, tx, sizeof(tx));
     esp_rom_delay_us(1);
-    gpio_set_level(device,1);
-
     return res;
+
 }
 
 bool ads1256_self_cal(ads1256_device_t device)
 {
     const uint8_t tx = SELFCAL_COMMAND;
-    gpio_set_level(device,0);
     bool res = ads1256_single_transmit(device, &tx, sizeof(tx));
-    vTaskDelay(pdMS_TO_TICKS(1000)); 
-    gpio_set_level(device,1);
-
+    vTaskDelay(pdMS_TO_TICKS(600)); 
     return res;
 }
 
 bool ads1256_sysocal(ads1256_device_t device)
 {
     const uint8_t tx = SYSOCAL_COMMAND;
-    gpio_set_level(device,0);
     bool res = ads1256_single_transmit(device, &tx, sizeof(tx));
-    vTaskDelay(pdMS_TO_TICKS(1000)); 
-    gpio_set_level(device,1);
+    vTaskDelay(pdMS_TO_TICKS(600)); 
     return res;
 }
 
 bool ads1256_sysgcal(ads1256_device_t device)
 {
     const uint8_t tx = SYSGCAL_COMMAND;
-    gpio_set_level(device,0);
     bool res = ads1256_single_transmit(device, &tx, sizeof(tx));
-    vTaskDelay(pdMS_TO_TICKS(1000)); 
-    gpio_set_level(device,1);
+    vTaskDelay(pdMS_TO_TICKS(600)); 
     return res;
 }
 
 bool ads1256_read_register(ads1256_device_t device, uint8_t register_address, uint8_t* value)
 {
     bool res = true;
-    uint8_t tx_data1[2] = {RREG_COMMAND | register_address, 0x00};
+    uint8_t tx_data[2] = {RREG_COMMAND | register_address, 0x00};
     uint8_t dummy_data = 0x00;
 
-    gpio_set_level(device,0);
-    res = res &&_ads1256_spi_transmit(tx_data1, sizeof(tx_data1), NULL, 0);
+    ads1256_spi_transmit_t ads_transmit = {
+        .tx_data = tx_data,
+        .tx_len = sizeof(tx_data),
+        .cs_pin = (device == ADS1256_DEVICE_1) ? CS_GPIO_1 : CS_GPIO_2,
+    };
+
+    res = res &&_ads1256_spi_transmit(&ads_transmit, NULL, 0);
     esp_rom_delay_us(7);
-    res = res &&_ads1256_spi_transmit(&dummy_data, 1, value, 1);
+
+    ads_transmit.tx_data = &dummy_data;
+    ads_transmit.tx_len = 1;
+
+    res = res &&_ads1256_spi_transmit(&ads_transmit, value, 1);
     esp_rom_delay_us(1);
-    gpio_set_level(device,1);
 
     return true;
 }
@@ -256,13 +371,20 @@ bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
         return false;
     }
 
-    ads1256_config_t *config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
+    ads1256_config_t config;
+    if(!valid_and_set_dev_config(device, &config)) {
+        return false;
+    }
 
+    if(config.active_channel == channel) {
+        return true;
+    }
 
-    bool result = ads1256_set_value(MUX_REGISTER, config->channels[channel].channel_num, device);
+    bool result = ads1256_set_value(MUX_REGISTER, config.channels[channel].channel_hex, device);
 
-    result = result && ads1256_set_calibration_registers(device, config->channels[channel].OFC_REG, config->channels[channel].FSC_REG);
-    if(result) { config->active_channel = channel;}
+    result = result && ads1256_set_calibration_registers(device, config.channels[channel].OFC_REG, config.channels[channel].FSC_REG);
+    if(result) { config.active_channel = channel; ESP_LOGI(TAG, "Channel changed to %d on device %d", channel, ads1256_device_to_number(device)); }
+    else { ESP_LOGE(TAG, "Failed to change channel to %d on device %d", channel, ads1256_device_to_number(device)); }
     return result;
 
 
@@ -283,11 +405,6 @@ bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value)
     }
 
     bool result = ads1256_set_value(DATA_RATE_REGISTER, sps_value, device);
-    if (result) {
-        ESP_LOGI(TAG, "Data rate set to %d SPS on %s", sps_value, ads1256_device_to_string(device));
-    } else {
-        ESP_LOGE(TAG, "Failed to set data rate on %s", ads1256_device_to_string(device));
-    }
     return result;
 }
 
@@ -298,20 +415,14 @@ bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* O
         return false;
     }
 
-    bool result = true;
-
     uint8_t tx[8] = {WREG_COMMAND | OFC0_REGISTER, 0x05, 
                      OFC_REGISTER[0], OFC_REGISTER[1], OFC_REGISTER[2],
                      FSC_REGISTER[0], FSC_REGISTER[1], FSC_REGISTER[2]};
 
-    gpio_set_level(device, 0);
-    result = result && _ads1256_spi_transmit(tx, sizeof(tx), NULL, 0);
-    esp_rom_delay_us(1);
-    gpio_set_level(device, 1);
 
-    if (!result) {
-        ESP_LOGE(TAG, "Failed to set calibration registers on %s", ads1256_device_to_string(device));
-    }
+    bool result = ads1256_single_transmit(device, tx, sizeof(tx));
+    esp_rom_delay_us(1);
+
     return result;
 }
 
@@ -366,19 +477,14 @@ bool ads1256_pins_init(void)
     gpio_intr_enable(DRDY_GPIO_1);
     gpio_intr_enable(DRDY_GPIO_2);
 
-    if(install_isr_service() == false)
+    if(!install_isr_service())
     {
         ESP_LOGE("ADS1256", "Failed to install ISR service");
         return false;
     }
-    if(setup_isr1() == false)
+    if(!setup_isr())
     {
-        ESP_LOGE("ADS1256", "Failed to setup ISR for DRDY_GPIO_1");
-        return false;
-    }
-    if(setup_isr2() == false)
-    {
-        ESP_LOGE("ADS1256", "Failed to setup ISR for DRDY_GPIO_2");
+        ESP_LOGE("ADS1256", "Failed to setup ISR");
         return false;
     }
     ESP_LOGI("ADS1256", "ADS1256 GPIO pins initialized successfully");
@@ -387,11 +493,14 @@ bool ads1256_pins_init(void)
 
 bool ads1256_init(ads1256_device_t device)
 {
-    ads1256_config_t* config = NULL;
-    if (device == ADS1256_DEVICE_1) { config = &ads1256_config_dev1; }
-    else if (device == ADS1256_DEVICE_2) { config = &ads1256_config_dev2; }
-    else {
-        ESP_LOGE(TAG, "Invalid device: %s", ads1256_device_to_string(device));
+    ads1256_config_t config;
+    data_dev1_mutex = xSemaphoreCreateMutex();
+    data_dev2_mutex = xSemaphoreCreateMutex();
+
+
+    if(!valid_and_set_dev_config(device, &config))
+    {
+        ESP_LOGE("ADS1256", "Invalid device configuration for device %d", ads1256_device_to_number(device));
         return false;
     }
 
@@ -404,6 +513,7 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to reset ADS1256");
         return false;
     }
+
     if(ads1256_set_value(STATUS_REGISTER, STATUS_REGISTER_DEFAULT, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 status register set successfully");
@@ -413,6 +523,7 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 status register");
         return false;
     }
+
     if(ads1256_set_value(ADCON_REGISTER, ADCON_REGISTER_SETUP, device))
     {
         ESP_LOGI("ADS1256", "ADS1256 ADCON register set successfully");
@@ -422,23 +533,25 @@ bool ads1256_init(ads1256_device_t device)
         ESP_LOGE("ADS1256", "Failed to set ADS1256 ADCON register");
         return false;
     }
-    if(!ads1256_change_channel(device, config->active_channel))
+
+    if(!ads1256_change_channel(device, config.active_channel))
     {
-        ESP_LOGE("ADS1256", "Failed to change channel on %s", ads1256_device_to_string(device));
+        ESP_LOGE("ADS1256", "Failed to change channel on dev: %d", ads1256_device_to_number(device));
         return false;
     }
     else
     {
-        ESP_LOGI("ADS1256", "Channel changed to %d on %s", config->channels[config->active_channel].channel_num, ads1256_device_to_string(device));
+        ESP_LOGI("ADS1256", "Channel changed to %d on dev: %d", config.channels[config.active_channel].channel_hex, ads1256_device_to_number(device));
     }
-    if(!ads1256_set_sps(device, config->sps))
+
+    if(!ads1256_set_sps(device, config.sps))
     {
-        ESP_LOGE("ADS1256", "Failed to set SPS on %s", ads1256_device_to_string(device));
+        ESP_LOGE("ADS1256", "Failed to set SPS on dev: %d", ads1256_device_to_number(device));
         return false;
     }
     else
     {
-        ESP_LOGI("ADS1256", "SPS set to %d on %s", config->sps, ads1256_device_to_string(device));
+        ESP_LOGI("ADS1256", "SPS set to %d on dev: %d", config.sps, ads1256_device_to_number(device));
     }
 
 
@@ -449,7 +562,12 @@ bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data)
 {
     uint8_t tx_data = RDATA_COMMAND; 
     uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
-    gpio_set_level(device,0);
+
+    ads1256_spi_transmit_t tx_transmit = {
+        .tx_data = dummy_data,
+        .tx_len = sizeof(dummy_data),
+        .cs_pin = (device == ADS1256_DEVICE_1) ? CS_GPIO_1 : CS_GPIO_2,
+    };
     
     if(!ads1256_single_transmit(device, &tx_data, sizeof(tx_data)))
     {
@@ -459,106 +577,139 @@ bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data)
 
     esp_rom_delay_us(7); 
 
-    if(!_ads1256_spi_transmit(dummy_data, sizeof(dummy_data), data, 3))
+    if(!_ads1256_spi_transmit(&tx_transmit, data, 3))
     {
         ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
         return false;
     }
-
-    gpio_set_level(device,1);
+    esp_rom_delay_us(1);
 
     return true;
 }
 
-bool ads1256_raw_data_to_value(uint8_t* data, double* value, uint8_t channel_num)
+bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value, uint8_t channel_num)
 {
     if (data == NULL || value == NULL) {
         ESP_LOGE(TAG, "Invalid data or value pointer");
+        return false;
+    }
+
+    ads1256_config_t config;
+
+    if (!valid_and_set_dev_config(dev, &config)) {
+        ESP_LOGE(TAG, "Invalid device configuration for device %d", ads1256_device_to_number(dev));
         return false;
     }
 
     int32_t raw_value = (data[0] << 16) | (data[1] << 8) | data[2];
+
     if (raw_value & 0x800000) {
-        raw_value |= 0xFF000000; // sign-extend if negative
+        raw_value |= 0xFF000000; 
     }
 
-    int32_t diff = raw_value - ads_cal_zero_offset[channel_num]; // zero offset
+    ads1256_channel_t channel;
+    int32_t zero_offset;
+    float factor;
+    bool res = get_channel_config(&config, &channel, channel_num);
+    get_factor_calibration(&channel, &factor);
+    get_zero_offset_calibration(&channel, &zero_offset);
 
-    *value = (double)diff/ads_cal_factor[channel_num];
+    if (!res) {
+        ESP_LOGE(TAG, "Failed to get channel configuration for device %d", ads1256_device_to_number(dev));
+        return false;
+    }
+
+    int32_t diff = raw_value - zero_offset;
+    *value = (float)diff / factor;
 
     return true;
 }
 
-bool ads1256_read_id(ads1256_device_t device)
+bool ads1256_read_id(ads1256_device_t device, uint8_t* id)
 {
-    uint8_t tx_data[2] = {0x12, 0x00};
-    uint8_t dummy_data = 0x00;
-    uint8_t rx_data = 0x00;
-    gpio_set_level(device,0);
-
-    if(!_ads1256_spi_transmit(tx_data, sizeof(tx_data), NULL, 0))
+    
+    if(!ads1256_read_register(device, STATUS_REGISTER, id))
     {
-        ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
-        return false;
-    }
-    esp_rom_delay_us(7);
-
-    if(!_ads1256_spi_transmit(&dummy_data, 1, &rx_data, 1))
-    {
-        ESP_LOGE("ADS1256", "Failed to read ID from ADS1256");
         return false;
     }
 
-    gpio_set_level(device,1);
-
-    uint8_t id = rx_data >> 4; 
-    ESP_LOGI("ADS1256", "ID: %d on %s", id, ads1256_device_to_string(device));
+    *id = *id >> 4; 
     return true;
 }
 
-void ads1256_raw_data_to_signed_value(uint8_t* data, int32_t* value)
+bool ads1256_change_channel_and_read(ads1256_device_t device, uint8_t channel, float* value)
 {
-    if (data == NULL || value == NULL) {
-        ESP_LOGE(TAG, "Invalid data or value pointer");
+    uint8_t raw_data[3] = {0, 0, 0};
+    bool res = ads1256_change_channel(device, channel);
+    res &= ads1256_sync(device);
+    res &= ads1256_wake_up(device);
+    res &= ads1256_get_raw_data(device, raw_data);
+    res &= ads1256_raw_data_to_value(device, raw_data, value, channel);
+
+    return res;
+}
+
+void ads1256_get_config_info(ads1256_device_t device)
+{
+    ads1256_config_t config;
+    if (!valid_and_set_dev_config(device, &config)) {
         return;
     }
 
-    *value = (data[0] << 16) | (data[1] << 8) | data[2];
-    if (*value & 0x800000) {
-        *value |= 0xFF000000; // sign-extend if negative
+    ESP_LOGI(TAG, "Device: %d", ads1256_device_to_number(device));
+    ESP_LOGI(TAG, "Active Channel: %d", config.active_channel);
+    ESP_LOGI(TAG, "Samples per Second: %d", ads1256_sps_hex_to_value(config.sps));
+
+    for (int i = 0; i < 4; i++) {
+        ads1256_channel_t* channel = &config.channels[i];
+        ESP_LOGI(TAG, "Channel %d: Hex Value: %02X Zero Offset: %d, Factor: %.2f", 
+                 i, channel->channel_hex, channel->zero_offset, channel->factor);
+        ESP_LOGI(TAG, "OFC_REG: %02X %02X %02X", channel->OFC_REG[0], channel->OFC_REG[1], channel->OFC_REG[2]);
+        ESP_LOGI(TAG, "FSC_REG: %02X %02X %02X", channel->FSC_REG[0], channel->FSC_REG[1], channel->FSC_REG[2]);
     }
 }
-void ads1256_raw_data_to_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t charnel_num)
+
+void ads1256_update_data_struct(ads1256_device_t device, ads1256_data_t* data)
 {
-    //TODO channel num nie zzmienia channelu, tylko bierze jego kalibracje (raw z aktualnego channelu)
-    if (data == NULL || weight == NULL) {
-        ESP_LOGE(TAG, "Invalid data or weight pointer");
+    if (data == NULL) {
+        ESP_LOGE(TAG, "Invalid data pointer");
         return;
     }
 
-    int32_t raw_value;
-    ads1256_raw_data_to_signed_value(data, &raw_value);
-    ads1256_config_t* config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
-    ads1256_channel_t *channel = &config->channels[charnel_num];
-
-    int32_t diff = raw_value - channel->zero_offset;
-    *weight = (float)diff / channel->factor;
+    if(device == ADS1256_DEVICE_1) {
+        xSemaphoreTake(data_dev1_mutex, portMAX_DELAY);
+        memcpy(ads1256_data_dev1.weight, data->weight, sizeof(data->weight));
+        xSemaphoreGive(data_dev1_mutex);
+    } else if(device == ADS1256_DEVICE_2) {
+        xSemaphoreTake(data_dev2_mutex, portMAX_DELAY);
+        memcpy(ads1256_data_dev2.weight, data->weight, sizeof(data->weight));
+        xSemaphoreGive(data_dev2_mutex);
+    } else {
+        ESP_LOGE(TAG, "Invalid device number: %d", ads1256_device_to_number(device));
+    }
 }
 
-void ads1256_raw_mux_data_to_single_weight(uint8_t* data, ads1256_device_t device, float* weight, uint8_t* channel_num, uint8_t channel_count)
+void ads1256_print_data(ads1256_device_t device)
 {
-    if (data == NULL || weight == NULL || channel_num == NULL || channel_count == 0) {
-        ESP_LOGE(TAG, "Invalid data, weight, channel_num or channel_count pointer");
+    ads1256_data_t data;
+
+    if (device == ADS1256_DEVICE_1) {
+        xSemaphoreTake(data_dev1_mutex, portMAX_DELAY);
+        data = ads1256_data_dev1;
+        xSemaphoreGive(data_dev1_mutex);
+    } else if (device == ADS1256_DEVICE_2) {
+        xSemaphoreTake(data_dev2_mutex, portMAX_DELAY);
+        data = ads1256_data_dev2;
+        xSemaphoreGive(data_dev2_mutex);
+    } else {
+        ESP_LOGE(TAG, "Invalid device number: %d", ads1256_device_to_number(device));
         return;
     }
 
-    float weight_tab[channel_count];
-
-    // ads1256_config_t* config = (device == ADS1256_DEVICE_1) ? &ads1256_config_dev1 : &ads1256_config_dev2;
-
-    for (int i = 0; i < channel_count; i++) {
-        ads1256_raw_data_to_weight(&data[i], device, &weight_tab[i], channel_num[i]);
-        *weight += weight_tab[i];
-    }
-    *weight /= channel_count;
+    ESP_LOGI(TAG, "Device: %d", ads1256_device_to_number(device));
+    ESP_LOGI(TAG, "Weight Channel 0: %.2f", data.weight[0]);
+    ESP_LOGI(TAG, "Weight Channel 1: %.2f", data.weight[1]);
+    ESP_LOGI(TAG, "Weight Channel 2: %.2f", data.weight[2]);
+    ESP_LOGI(TAG, "Weight Channel 3: %.2f", data.weight[3]);
 }
+

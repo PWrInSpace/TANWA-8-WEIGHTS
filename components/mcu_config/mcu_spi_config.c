@@ -61,14 +61,16 @@ bool _ads1256_add_device(void) {
 }             
 
 
-bool _ads1256_spi_transmit(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_data, size_t rx_len) {
+bool _ads1256_spi_transmit(ads1256_spi_transmit_t* ads_transmit, uint8_t* rx_data, size_t rx_len) {
   spi_transaction_t t = {.flags = 0,
-                          .length = 8 * sizeof(uint8_t) * tx_len,
-                          .tx_buffer = tx_data,
+                          .length = 8 * sizeof(uint8_t) * ads_transmit->tx_len,
+                          .tx_buffer = ads_transmit->tx_data,
                           .rxlength = 8 * sizeof(uint8_t) * rx_len,
                           .rx_buffer = rx_data};
   xSemaphoreTake(mutex_spi, portMAX_DELAY);
+  gpio_set_level(ads_transmit->cs_pin, 0);
   esp_err_t res = spi_device_transmit(spi_config.spi_ads1256_handle, &t);
+  gpio_set_level(ads_transmit->cs_pin, 1);
   xSemaphoreGive(mutex_spi);
   if (res != ESP_OK) {
       ESP_LOGE(TAG, "SPI transmission failed: %s", esp_err_to_name(res));
