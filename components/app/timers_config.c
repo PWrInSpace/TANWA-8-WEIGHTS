@@ -41,7 +41,7 @@ bool start_stopping_readc_task(uint16_t seconds) {
         return false;
     }
 
-    uint16_t milliseconds = seconds * 1000;
+    uint32_t milliseconds = seconds * 1000;
 
     return sys_timer_start(1, milliseconds, TIMER_TYPE_ONE_SHOT);
 }

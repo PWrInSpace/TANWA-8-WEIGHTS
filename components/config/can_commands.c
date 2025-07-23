@@ -161,7 +161,10 @@ esp_err_t can_set_ads_ch(uint8_t *data, uint8_t length)
         return ESP_FAIL;
     }
 
-    //zmien mux i ustaw kanal w structach
+    if(!ads1256_change_channel(ads_device, channel_num)) {
+        ESP_LOGE(TAG, "Failed to change channel on device %d", ads1256_device_to_number(ads_device));
+        return ESP_FAIL;
+    }
 
     return ESP_OK;
 }
@@ -169,15 +172,17 @@ esp_err_t can_set_ads_ch(uint8_t *data, uint8_t length)
 esp_err_t can_set_ads_offset(uint8_t *data, uint8_t length)
 {
     /*
-    * data length = 5 bytes
+    * data length = 6 bytes
     * data[0] = dev_num (1 or 2)
-    * data[1..4] = offset (int32_t)
+    * data[1] = channel_num (0-3)
+    * data[2..5] = offset (int32_t)
     */
 
     ads1256_device_t ads_device;
     int32_t offset;
+    uint8_t channel_num;
 
-    if(!valid_data_length(length, 5)) {
+    if(!valid_data_length(length, 6)) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -185,9 +190,16 @@ esp_err_t can_set_ads_offset(uint8_t *data, uint8_t length)
         return ESP_FAIL;
     }
 
-    memcpy(&offset, &data[1], sizeof(offset));
+    if(!valid_and_set_channel(data[1], &channel_num)) {
+        return ESP_FAIL;
+    }
 
-    //ustaw nowy offset w structach
+    memcpy(&offset, &data[2], sizeof(offset));
+
+    if(!ads1256_set_zero_offset(ads_device, offset, channel_num)) {
+        ESP_LOGE(TAG, "Failed to set zero offset on device %d", ads1256_device_to_number(ads_device));
+        return ESP_FAIL;
+    }
 
     return ESP_OK;
 }
@@ -208,19 +220,18 @@ esp_err_t can_get_ads_ch_all_weight(uint8_t *data, uint8_t length)
     if(!valid_and_set_device(data[0], &ads_device)) {
         return ESP_FAIL;
     }
-    float weight_ch0 = 0.0f;
-    float weight_ch1 = 0.0f;
-    float weight_ch2 = 0.0f;
-    float weight_ch3 = 0.0f;
 
-    //odczytaj wszystkie kanaly
+    ads1256_data_t ads_data;
+    if(!ads1256_get_data_struct_copy(ads_device, &ads_data)) {
+        ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_1");
+        return ESP_FAIL;
+    }
 
     uint8_t resp[16];
-    memcpy(resp, &weight_ch0, sizeof(weight_ch0));
-    memcpy(&resp[4], &weight_ch1, sizeof(weight_ch1));
-    memcpy(&resp[8], &weight_ch2, sizeof(weight_ch2));
-    memcpy(&resp[12], &weight_ch3, sizeof(weight_ch3));
-
+    memcpy(resp, &ads_data.weight[0], sizeof(float));
+    memcpy(&resp[4], &ads_data.weight[1], sizeof(float));
+    memcpy(&resp[8], &ads_data.weight[2], sizeof(float));
+    memcpy(&resp[12], &ads_data.weight[3], sizeof(float));
     
     if(ads_device == ADS1256_DEVICE_1) {
         if(can_send_message(CAN_SEND_ADS1_ALL_CH_WEIGHT1, resp, sizeof(resp)/2) != ESP_OK) {
@@ -259,11 +270,6 @@ esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length)
     ads1256_device_t ads_device;
     uint8_t channel_num;
 
-    if(only_readc_task) //TODO: male prio ale mozna cos lepszego kiedys wymyslic
-    {
-        return ESP_OK; 
-    }
-
     if(!valid_data_length(length, 2)) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -277,10 +283,16 @@ esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length)
     }
 
 
-    // pobieranie danych ze structa danowego 
+    ads1256_data_t ads_data;
+    if(!ads1256_get_data_struct_copy(ads_device, &ads_data)) {
+        ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_1");
+        return ESP_FAIL;
+    }
+
+    float weight = ads_data.weight[channel_num];
 
     uint8_t resp[4];
-    // memcpy(resp, &weight, sizeof(weight));
+    memcpy(resp, &weight, sizeof(weight));
     esp_err_t err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp, sizeof(resp));
     return err;
 }
@@ -294,9 +306,22 @@ esp_err_t can_get_weights(uint8_t *data, uint8_t length)
     uint8_t resp[8];
     float r_weight = 0.0f;
     float n2o_weight = 0.0f;
-    // pobieranie danych ze structa danowego
-    memcpy(resp, &r_weight, sizeof(r_weight));
-    memcpy(&resp[4], &n2o_weight, sizeof(n2o_weight));
+
+    ads1256_data_t ads_data_r;  
+    ads1256_data_t ads_data_n2o;
+
+    if(!ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &ads_data_r) || !ads1256_get_data_struct_copy(ADS1256_DEVICE_2, &ads_data_n2o)) {
+        ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_1");
+        return ESP_FAIL;
+    }
+
+    for(int i = 0; i < 4; i++) {
+        r_weight += ads_data_r.weight[i];
+        n2o_weight += ads_data_n2o.weight[i];
+    }
+    
+    memcpy(resp, &n2o_weight, sizeof(n2o_weight));
+    memcpy(&resp[4], &r_weight, sizeof(r_weight));
     esp_err_t err = can_send_message(CAN_SEND_WEIGHTS, resp, sizeof(resp));
     return err;
 }

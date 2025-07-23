@@ -7,6 +7,7 @@
 #include "sd_task.h"
 
 volatile bool readc_stop_flag = false;
+volatile bool read_mux_stop_flag = false;
 readc_frame_t* buffer_readc_A;
 readc_frame_t* buffer_readc_B;
 readc_frame_t* buffer_readc_current;
@@ -19,6 +20,11 @@ SemaphoreHandle_t buffer_A_ready = NULL;
 SemaphoreHandle_t buffer_B_ready = NULL;
 SemaphoreHandle_t current_mutex = NULL;
 SemaphoreHandle_t current_sync = NULL;
+
+typedef struct ads1256_task_args_t {
+    ads1256_device_t device;
+    TaskHandle_t* task_handle;
+} ads1256_task_args_t;
 
 bool ads1256_task_init(void)
 {
@@ -57,6 +63,8 @@ bool ads1256_task_init(void)
     //     return false;
     // }
 
+    ads1256_start_channel_task(ADS1256_DEVICE_1); //TODO: remove this line leater
+
     return true;
 }
 
@@ -65,7 +73,11 @@ void ads1256_read_data_continuously(void*  pvParameters)
 
     ESP_LOGI("ADS1256", "Starting continuous read task for device 15");
 
-    // ads1256_device_t* device = (ads1256_device_t*)pvParameters;
+    ads1256_task_args_t* args = (ads1256_task_args_t*)pvParameters;
+    ads1256_device_t device = args->device;
+    TaskHandle_t* task_handle = args->task_handle;
+    free(args);
+
     uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
     int64_t start_time_us = esp_timer_get_time();
     buffer_readc_index = 0;
@@ -78,7 +90,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
     if(!xSemaphoreTake(current_mutex, portMAX_DELAY))
     {
         ESP_LOGE("ADS1256", "Failed to take mutex");
-        // free(device);
+        *task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -91,7 +103,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
         {
             ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
         }
-        buffer_readc_current[buffer_readc_index].time = (uint16_t)(((esp_timer_get_time() - start_time_us)/1000) & 0xFFFF);
+        buffer_readc_current[buffer_readc_index].time = (uint32_t)((esp_timer_get_time() - start_time_us)/1000);
 
         buffer_readc_index++;
 
@@ -122,7 +134,6 @@ void ads1256_read_data_continuously(void*  pvParameters)
             if(!xSemaphoreTake(current_mutex, portMAX_DELAY))
             {
                 ESP_LOGE("ADS1256", "Failed to take mutex after switching buffers");
-                // free(device);
                 vTaskDelete(NULL);
                 return;
             }
@@ -137,6 +148,10 @@ void ads1256_read_data_continuously(void*  pvParameters)
     xSemaphoreGive(current_mutex);
 
     new_filename_flag = true; 
+    ESP_LOGI("ADS1256", "Stopping continuous read task for device %d", ads1256_device_to_number(device));
+
+    ads1256_stop_continuous_read(device);
+    *task_handle = NULL;
     vTaskDelete(NULL);
 
 }
@@ -144,58 +159,80 @@ void ads1256_read_data_continuously(void*  pvParameters)
 
 void ads1256_start_readc(ads1256_device_t device)
 {
-    uint8_t tx_data = RDATAC_COMMAND;
+    ads1256_task_args_t* args = malloc(sizeof(ads1256_task_args_t));
+    args->device = device;
 
-    ads1256_device_t* device_ptr = malloc(sizeof(ads1256_device_t));
-    if (device_ptr == NULL) {
-        ESP_LOGE("ADS1256", "Failed to allocate memory for device");
+    if(device != ADS1256_DEVICE_1) //TODO : remove this line later
+    {
+        ESP_LOGE("ADS1256", "SPI QUEUE DZIALA TYLKO DLA DEVICE_1");
+        free(args);
         return;
     }
 
-    *device_ptr = device;
 
-    gpio_set_level(device, 0); 
-    if(ads1256_single_transmit(device, &tx_data, sizeof(tx_data)) == false)
+    if (device == ADS1256_DEVICE_1)
     {
-        ESP_LOGE("ADS1256", "Failed to start continuous read on ADS1256");
+        args->task_handle = &DRDY1_task;
+    }
+    else if (device == ADS1256_DEVICE_2)
+    {
+        args->task_handle = &DRDY2_task;
+    }
+    else 
+    {
+        ESP_LOGE("ADS1256", "Invalid device number: %d", ads1256_device_to_number(device));
+        free(args);
+        return;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(1)); 
+    if(read_mux_stop_flag == false)
+    {
+        read_mux_stop_flag = true;
+        vTaskDelay(pdMS_TO_TICKS(50)); // Wait for any ongoing read_mux task to finish
+    }
+    
+    ads1256_change_channel(device, HAMOWNIA_CHANNEL);
+    ads1256_start_continuous_read(device);
+    vTaskDelay(pdMS_TO_TICKS(1));
 
-    gpio_set_level(device, 1); 
+    if (*args->task_handle != NULL) {
+        ESP_LOGE("ADS1256", "Task handle is not NULL, cannot create new task for device %d", ads1256_device_to_number(device));
+        free(args);
+        return;
+    }
 
-    if (xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 8192, (void*)device_ptr, 10, &DRDY1_task) != pdPASS) {
+    if (xTaskCreate(ads1256_read_data_continuously, "ads1256_task_readc", 8192, args, 10, args->task_handle) != pdPASS) {
         ESP_LOGE("ADS1256", "Failed to create ADS1256 read task");
-        // free(device_ptr); 
+        free(args); 
     }
 }
 
 
 void ads1256_data_from_channels(void*  pvParameters)
 {
-    ads1256_device_t* device = (ads1256_device_t*)pvParameters;
+    ads1256_task_args_t* args = (ads1256_task_args_t*)pvParameters;
+    ads1256_device_t device = args->device;
+    TaskHandle_t* task_handle = args->task_handle;
+    free(args);
+
     ads1256_data_t data = {{0.0f, 0.0f, 0.0f, 0.0f}};
+    read_mux_stop_flag = false;
+    uint8_t iterator = 0;
 
-    while (1)
+    while (!read_mux_stop_flag)
     {
-
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel_and_read(*device, 0, &data.weight[0]);
+        ads1256_change_channel_and_read(device, iterator, &data.weight[iterator]);
+        iterator++;
 
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel_and_read(*device, 1, &data.weight[1]);
-
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel_and_read(*device, 2, &data.weight[2]);
-
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel_and_read(*device, 3, &data.weight[3]);
-
-        ads1256_update_data_struct(*device, &data);
-        
+        if(iterator >= 4)
+        {
+            iterator = 0;
+            ads1256_update_data_struct(device, &data);
+        }
     }
 
-    free(device);
+    *task_handle = NULL;
     vTaskDelete(NULL);
     
 }
@@ -203,11 +240,97 @@ void ads1256_data_from_channels(void*  pvParameters)
 
 void ads1256_start_channel_task(ads1256_device_t device)
 {
-    ads1256_device_t* device_ptr = malloc(sizeof(ads1256_device_t));
-    if (device_ptr == NULL) {
-        ESP_LOGE("ADS1256", "Failed to allocate memory for device");
+    ads1256_task_args_t* args = malloc(sizeof(ads1256_task_args_t));
+    args->device = device;
+
+    if (device == ADS1256_DEVICE_1)
+    {
+        args->task_handle = &DRDY1_task;
+    }
+    else if (device == ADS1256_DEVICE_2)
+    {
+        args->task_handle = &DRDY2_task;
+    }
+    else 
+    {
+        ESP_LOGE("ADS1256", "Invalid device number: %d", ads1256_device_to_number(device));
+        free(args);
         return;
     }
-    *device_ptr = device;
-    xTaskCreate(ads1256_data_from_channels, "ads1256_channel_task", 4096, (void*)device_ptr, 10, &DRDY1_task);
+
+    if (*args->task_handle != NULL) {
+        ESP_LOGE("ADS1256", "Task handle is not NULL, cannot create new task for device %d", ads1256_device_to_number(device));
+        free(args);
+        return;
+    }
+
+    if(xTaskCreate(ads1256_data_from_channels, "ads1256_channel_task", 4096, args, 10, args->task_handle) != pdPASS)
+    {
+        ESP_LOGE("ADS1256", "Failed to create ADS1256 channel task for device %d", ads1256_device_to_number(device));
+        free(args);
+        return;
+    }
+}
+
+void ads1256_suspend_task(ads1256_device_t device)
+{
+    TaskHandle_t *task_handle;
+
+    if(device == ADS1256_DEVICE_1) {
+        task_handle = &DRDY1_task;
+    } else if(device == ADS1256_DEVICE_2) {
+        task_handle = &DRDY2_task;
+    } else {
+        ESP_LOGE("ADS1256", "Invalid device number: %d", ads1256_device_to_number(device));
+        return;
+    }
+
+    if (*task_handle != NULL) {
+        vTaskSuspend(*task_handle);
+        ESP_LOGI("ADS1256", "Suspended channel task for device %d", ads1256_device_to_number(device));
+    } else {
+        ESP_LOGE("ADS1256", "Task handle is NULL, cannot suspend task for device %d", ads1256_device_to_number(device));
+    }
+}
+
+void ads1256_resume_task(ads1256_device_t device)
+{
+    TaskHandle_t *task_handle;
+
+    if(device == ADS1256_DEVICE_1) {
+        task_handle = &DRDY1_task;
+    } else if(device == ADS1256_DEVICE_2) {
+        task_handle = &DRDY2_task;
+    } else {
+        ESP_LOGE("ADS1256", "Invalid device number: %d", ads1256_device_to_number(device));
+        return;
+    }
+
+    if (*task_handle != NULL) {
+        vTaskResume(*task_handle);
+        ESP_LOGI("ADS1256", "Resumed channel task for device %d", ads1256_device_to_number(device));
+    } else {
+        ESP_LOGE("ADS1256", "Task handle is NULL, cannot resume task for device %d", ads1256_device_to_number(device));
+    }
+}
+
+void ads1256_delete_task(ads1256_device_t device)
+{
+    TaskHandle_t *task_handle;
+
+    if(device == ADS1256_DEVICE_1) {
+        task_handle = &DRDY1_task;
+    } else if(device == ADS1256_DEVICE_2) {
+        task_handle = &DRDY2_task;
+    } else {
+        ESP_LOGE("ADS1256", "Invalid device number: %d", ads1256_device_to_number(device));
+        return;
+    }
+
+    if (*task_handle != NULL) {
+       *task_handle = NULL;
+        ESP_LOGI("ADS1256", "Deleted task for device %d", ads1256_device_to_number(device));
+    } else {
+        ESP_LOGE("ADS1256", "Task handle is NULL, cannot delete task for device %d", ads1256_device_to_number(device));
+    }
 }

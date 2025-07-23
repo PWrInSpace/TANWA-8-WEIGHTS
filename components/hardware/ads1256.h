@@ -136,7 +136,7 @@ int ads1256_device_to_number(ads1256_device_t device);
 
 bool ads1256_init(ads1256_device_t device);
 bool ads1256_pins_init(void);
-bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length);
+bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length, uint8_t* rx_data, size_t rx_length);
 bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data);
 bool ads1256_read_id(ads1256_device_t device, uint8_t* id);
 bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
@@ -149,6 +149,11 @@ bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value);
 bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* OFC_REGISTER, const uint8_t* FSC_REGISTER);
 bool ads1256_change_channel_and_read(ads1256_device_t device, uint8_t channel, float* value);
 bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value, uint8_t channel_num);
+bool ads1256_stop_continuous_read(ads1256_device_t device);
+bool ads1256_start_continuous_read(ads1256_device_t device);
+bool ads1256_get_data_struct_copy(ads1256_device_t device, ads1256_data_t* data);
+
+bool ads1256_set_zero_offset(ads1256_device_t device, int32_t zero_offset, uint8_t channel_num);
 
 void ads1256_get_config_info(ads1256_device_t device);
 void ads1256_update_data_struct(ads1256_device_t device, ads1256_data_t* data);

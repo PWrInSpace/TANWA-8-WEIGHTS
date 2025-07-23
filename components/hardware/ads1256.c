@@ -162,16 +162,38 @@ int ads1256_sps_hex_to_value(ads1256_sps_e sps) {
     }
 }
 
-bool valid_and_set_dev_config(ads1256_device_t device, ads1256_config_t* config) {
+bool valid_and_set_dev_config(ads1256_device_t device, ads1256_config_t** config) {
     if (device == ADS1256_DEVICE_1) {
-        *config = ads1256_config_dev1;
+        *config = &ads1256_config_dev1;
     } else if (device == ADS1256_DEVICE_2) {
-        *config = ads1256_config_dev2;
+        *config = &ads1256_config_dev2;
     } else {
         ESP_LOGE(TAG, "Invalid device number: %d", device);
         return false;
     }
     return true;
+}
+
+bool ads1256_set_zero_offset(ads1256_device_t device, int32_t zero_offset, uint8_t channel_num)
+{
+    if (channel_num > 3) {
+        ESP_LOGE(TAG, "Invalid channel number: %d", channel_num);
+        return false;
+    }
+
+    ads1256_config_t* config;
+    if (!valid_and_set_dev_config(device, &config)) {
+        ESP_LOGE(TAG, "Invalid device number: %d", ads1256_device_to_number(device));
+        return false;
+    }
+
+    ads1256_channel_t channel_config;
+    if (!get_channel_config(config, &channel_config, channel_num)) {
+        ESP_LOGE(TAG, "Failed to get channel configuration");
+        return false;
+    }
+
+    return set_zero_offset_calibration(&channel_config, zero_offset);
 }
 
 bool install_isr_service()
@@ -235,9 +257,9 @@ bool setup_isr() {
 }
 
 
-bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length)
+bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length, uint8_t* rx_data, size_t rx_length)
 {
-    if (tx_data == NULL || tx_length == 0) {
+    if ((tx_data == NULL || tx_length == 0) || (rx_data == NULL && rx_length > 0)) {
         ESP_LOGE(TAG, "Invalid transmit data or length");
         return false;
     }
@@ -246,21 +268,20 @@ bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, si
         .tx_data = tx_data,
         .tx_len = tx_length,
         .cs_pin = (device == ADS1256_DEVICE_1) ? CS_GPIO_1 : CS_GPIO_2,
+        .rx_enabled = (rx_length > 0)
     };
 
-    if(!_ads1256_spi_transmit(&ads_transmit, NULL, 0)) {
+    if(!_ads1256_spi_transmit(&ads_transmit, rx_data, rx_length)) {
         ESP_LOGE(TAG, "Failed to transmit data to ADS1256");
         return false;
     }
     return true;
-
 }
 
 bool ads1256_set_value(uint8_t register_address, uint8_t value, ads1256_device_t device)
 {
     uint8_t tx[3] = {WREG_COMMAND | register_address, 0x00, value};
-    bool res = ads1256_single_transmit(device, tx, sizeof(tx));
-    esp_rom_delay_us(1);
+    bool res = ads1256_single_transmit(device, tx, sizeof(tx), NULL, 0);
     return res;
 
 }
@@ -268,7 +289,7 @@ bool ads1256_set_value(uint8_t register_address, uint8_t value, ads1256_device_t
 bool ads1256_self_cal(ads1256_device_t device)
 {
     const uint8_t tx = SELFCAL_COMMAND;
-    bool res = ads1256_single_transmit(device, &tx, sizeof(tx));
+    bool res = ads1256_single_transmit(device, &tx, sizeof(tx), NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(600)); 
     return res;
 }
@@ -276,7 +297,7 @@ bool ads1256_self_cal(ads1256_device_t device)
 bool ads1256_sysocal(ads1256_device_t device)
 {
     const uint8_t tx = SYSOCAL_COMMAND;
-    bool res = ads1256_single_transmit(device, &tx, sizeof(tx));
+    bool res = ads1256_single_transmit(device, &tx, sizeof(tx), NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(600)); 
     return res;
 }
@@ -284,33 +305,15 @@ bool ads1256_sysocal(ads1256_device_t device)
 bool ads1256_sysgcal(ads1256_device_t device)
 {
     const uint8_t tx = SYSGCAL_COMMAND;
-    bool res = ads1256_single_transmit(device, &tx, sizeof(tx));
+    bool res = ads1256_single_transmit(device, &tx, sizeof(tx), NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(600)); 
     return res;
 }
 
 bool ads1256_read_register(ads1256_device_t device, uint8_t register_address, uint8_t* value)
 {
-    bool res = true;
     uint8_t tx_data[2] = {RREG_COMMAND | register_address, 0x00};
-    uint8_t dummy_data = 0x00;
-
-    ads1256_spi_transmit_t ads_transmit = {
-        .tx_data = tx_data,
-        .tx_len = sizeof(tx_data),
-        .cs_pin = (device == ADS1256_DEVICE_1) ? CS_GPIO_1 : CS_GPIO_2,
-    };
-
-    res = res &&_ads1256_spi_transmit(&ads_transmit, NULL, 0);
-    esp_rom_delay_us(7);
-
-    ads_transmit.tx_data = &dummy_data;
-    ads_transmit.tx_len = 1;
-
-    res = res &&_ads1256_spi_transmit(&ads_transmit, value, 1);
-    esp_rom_delay_us(1);
-
-    return true;
+    return ads1256_single_transmit(device, tx_data, sizeof(tx_data), value, 1);
 }
 
 bool ads1256_read_cal_registers(ads1256_device_t device)
@@ -336,32 +339,21 @@ bool ads1256_read_cal_registers(ads1256_device_t device)
 bool ads1256_reset(ads1256_device_t device)
 {
     const uint8_t tx = RESET_COMMAND;
-
-    gpio_set_level(device,0);
-    bool result = ads1256_single_transmit(device, &tx, sizeof(tx));
+    bool result = ads1256_single_transmit(device, &tx, sizeof(tx), NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(100)); 
-    gpio_set_level(device,1);
     return result;
 }
 
 bool ads1256_wake_up(ads1256_device_t device)
 {
     const uint8_t tx = WAKEUP_COMMAND;
-    gpio_set_level(device, 0); 
-    bool result = ads1256_single_transmit(device, &tx, sizeof(tx));
-    esp_rom_delay_us(1);
-    gpio_set_level(device, 1);
-    return result;
+    return ads1256_single_transmit(device, &tx, sizeof(tx), NULL, 0);
 }
 
 bool ads1256_sync(ads1256_device_t device)
 {
     const uint8_t tx = SYNC_COMMAND;
-    gpio_set_level(device, 0);
-    bool result = ads1256_single_transmit(device, &tx, sizeof(tx));
-    esp_rom_delay_us(1);
-    gpio_set_level(device, 1);
-    return result;
+    return ads1256_single_transmit(device, &tx, sizeof(tx), NULL, 0);
 }
 
 bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
@@ -371,23 +363,24 @@ bool ads1256_change_channel(ads1256_device_t device, uint8_t channel)
         return false;
     }
 
-    ads1256_config_t config;
+    ads1256_config_t* config;
     if(!valid_and_set_dev_config(device, &config)) {
         return false;
     }
 
-    if(config.active_channel == channel) {
+    if(config->active_channel == channel) {
         return true;
     }
 
-    bool result = ads1256_set_value(MUX_REGISTER, config.channels[channel].channel_hex, device);
+    bool result = true;
 
-    result = result && ads1256_set_calibration_registers(device, config.channels[channel].OFC_REG, config.channels[channel].FSC_REG);
-    if(result) { config.active_channel = channel; ESP_LOGI(TAG, "Channel changed to %d on device %d", channel, ads1256_device_to_number(device)); }
-    else { ESP_LOGE(TAG, "Failed to change channel to %d on device %d", channel, ads1256_device_to_number(device)); }
+    result &= ads1256_set_value(MUX_REGISTER, config->channels[channel].channel_hex, device);
+
+    if(result) { config->active_channel = channel;}
+
+    result &= ads1256_set_calibration_registers(device, config->channels[channel].OFC_REG, config->channels[channel].FSC_REG);
+
     return result;
-
-
 }
 
 bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value)
@@ -420,8 +413,7 @@ bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* O
                      FSC_REGISTER[0], FSC_REGISTER[1], FSC_REGISTER[2]};
 
 
-    bool result = ads1256_single_transmit(device, tx, sizeof(tx));
-    esp_rom_delay_us(1);
+    bool result = ads1256_single_transmit(device, tx, sizeof(tx), NULL, 0);
 
     return result;
 }
@@ -451,9 +443,9 @@ bool ads1256_pins_init(void)
     }
 
     ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_1, 1));  
-    ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 0)); 
+    ESP_ERROR_CHECK(gpio_set_level(CS_GPIO_2, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_1, 1)); 
-    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 0)); 
+    ESP_ERROR_CHECK(gpio_set_level(RESET_GPIO_2, 0)); //TODO gdzy bedzie nowa plytka to na 1
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_1, 1)); 
     ESP_ERROR_CHECK(gpio_set_level(PWDN_GPIO_2, 1)); 
 
@@ -493,7 +485,7 @@ bool ads1256_pins_init(void)
 
 bool ads1256_init(ads1256_device_t device)
 {
-    ads1256_config_t config;
+    ads1256_config_t* config;
     data_dev1_mutex = xSemaphoreCreateMutex();
     data_dev2_mutex = xSemaphoreCreateMutex();
 
@@ -534,26 +526,25 @@ bool ads1256_init(ads1256_device_t device)
         return false;
     }
 
-    if(!ads1256_change_channel(device, config.active_channel))
+    if(!ads1256_change_channel(device, config->active_channel))
     {
         ESP_LOGE("ADS1256", "Failed to change channel on dev: %d", ads1256_device_to_number(device));
         return false;
     }
     else
     {
-        ESP_LOGI("ADS1256", "Channel changed to %d on dev: %d", config.channels[config.active_channel].channel_hex, ads1256_device_to_number(device));
+        ESP_LOGI("ADS1256", "Channel changed to %d on dev: %d", config->channels[config->active_channel].channel_hex, ads1256_device_to_number(device));
     }
 
-    if(!ads1256_set_sps(device, config.sps))
+    if(!ads1256_set_sps(device, config->sps))
     {
         ESP_LOGE("ADS1256", "Failed to set SPS on dev: %d", ads1256_device_to_number(device));
         return false;
     }
     else
     {
-        ESP_LOGI("ADS1256", "SPS set to %d on dev: %d", config.sps, ads1256_device_to_number(device));
+        ESP_LOGI("ADS1256", "SPS set to %d on dev: %d", config->sps, ads1256_device_to_number(device));
     }
-
 
     return true;
 }
@@ -561,28 +552,12 @@ bool ads1256_init(ads1256_device_t device)
 bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data)
 {
     uint8_t tx_data = RDATA_COMMAND; 
-    uint8_t dummy_data[3] = {0x00, 0x00, 0x00}; 
-
-    ads1256_spi_transmit_t tx_transmit = {
-        .tx_data = dummy_data,
-        .tx_len = sizeof(dummy_data),
-        .cs_pin = (device == ADS1256_DEVICE_1) ? CS_GPIO_1 : CS_GPIO_2,
-    };
     
-    if(!ads1256_single_transmit(device, &tx_data, sizeof(tx_data)))
+    if(!ads1256_single_transmit(device, &tx_data, sizeof(tx_data), data, 3))
     {
         ESP_LOGE("ADS1256", "Failed to send RDATA command to ADS1256");
         return false;
     }
-
-    esp_rom_delay_us(7); 
-
-    if(!_ads1256_spi_transmit(&tx_transmit, data, 3))
-    {
-        ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
-        return false;
-    }
-    esp_rom_delay_us(1);
 
     return true;
 }
@@ -594,12 +569,17 @@ bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value
         return false;
     }
 
-    ads1256_config_t config;
+    ads1256_config_t* config;
 
     if (!valid_and_set_dev_config(dev, &config)) {
         ESP_LOGE(TAG, "Invalid device configuration for device %d", ads1256_device_to_number(dev));
         return false;
     }
+
+    bool res = true;
+    ads1256_channel_t channel;
+    int32_t zero_offset;
+    float factor;
 
     int32_t raw_value = (data[0] << 16) | (data[1] << 8) | data[2];
 
@@ -607,12 +587,9 @@ bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value
         raw_value |= 0xFF000000; 
     }
 
-    ads1256_channel_t channel;
-    int32_t zero_offset;
-    float factor;
-    bool res = get_channel_config(&config, &channel, channel_num);
-    get_factor_calibration(&channel, &factor);
-    get_zero_offset_calibration(&channel, &zero_offset);
+    res &= get_channel_config(config, &channel, channel_num);
+    res &= get_factor_calibration(&channel, &factor);
+    res &= get_zero_offset_calibration(&channel, &zero_offset);
 
     if (!res) {
         ESP_LOGE(TAG, "Failed to get channel configuration for device %d", ads1256_device_to_number(dev));
@@ -651,17 +628,17 @@ bool ads1256_change_channel_and_read(ads1256_device_t device, uint8_t channel, f
 
 void ads1256_get_config_info(ads1256_device_t device)
 {
-    ads1256_config_t config;
+    ads1256_config_t* config;
     if (!valid_and_set_dev_config(device, &config)) {
         return;
     }
 
     ESP_LOGI(TAG, "Device: %d", ads1256_device_to_number(device));
-    ESP_LOGI(TAG, "Active Channel: %d", config.active_channel);
-    ESP_LOGI(TAG, "Samples per Second: %d", ads1256_sps_hex_to_value(config.sps));
+    ESP_LOGI(TAG, "Active Channel: %d", config->active_channel);
+    ESP_LOGI(TAG, "Samples per Second: %d", ads1256_sps_hex_to_value(config->sps));
 
     for (int i = 0; i < 4; i++) {
-        ads1256_channel_t* channel = &config.channels[i];
+        ads1256_channel_t* channel = &config->channels[i];
         ESP_LOGI(TAG, "Channel %d: Hex Value: %02X Zero Offset: %d, Factor: %.2f", 
                  i, channel->channel_hex, channel->zero_offset, channel->factor);
         ESP_LOGI(TAG, "OFC_REG: %02X %02X %02X", channel->OFC_REG[0], channel->OFC_REG[1], channel->OFC_REG[2]);
@@ -689,20 +666,35 @@ void ads1256_update_data_struct(ads1256_device_t device, ads1256_data_t* data)
     }
 }
 
+bool ads1256_get_data_struct_copy(ads1256_device_t device, ads1256_data_t* data)
+{
+    if(data == NULL) {
+        ESP_LOGE(TAG, "Invalid data pointer");
+        return false;
+    }
+
+    if (device == ADS1256_DEVICE_1) {
+        xSemaphoreTake(data_dev1_mutex, portMAX_DELAY);
+        memcpy(data, &ads1256_data_dev1, sizeof(ads1256_data_t));
+        xSemaphoreGive(data_dev1_mutex);
+    } else if (device == ADS1256_DEVICE_2) {
+        xSemaphoreTake(data_dev2_mutex, portMAX_DELAY);
+        memcpy(data, &ads1256_data_dev2, sizeof(ads1256_data_t));
+        xSemaphoreGive(data_dev2_mutex);
+    } else {
+        ESP_LOGE(TAG, "Invalid device number: %d", ads1256_device_to_number(device));
+        return false;
+    }
+
+    return true;
+}
+
 void ads1256_print_data(ads1256_device_t device)
 {
     ads1256_data_t data;
 
-    if (device == ADS1256_DEVICE_1) {
-        xSemaphoreTake(data_dev1_mutex, portMAX_DELAY);
-        data = ads1256_data_dev1;
-        xSemaphoreGive(data_dev1_mutex);
-    } else if (device == ADS1256_DEVICE_2) {
-        xSemaphoreTake(data_dev2_mutex, portMAX_DELAY);
-        data = ads1256_data_dev2;
-        xSemaphoreGive(data_dev2_mutex);
-    } else {
-        ESP_LOGE(TAG, "Invalid device number: %d", ads1256_device_to_number(device));
+    if (!ads1256_get_data_struct_copy(device, &data)) {
+        ESP_LOGE(TAG, "Failed to get data for device %d", ads1256_device_to_number(device));
         return;
     }
 
@@ -713,3 +705,40 @@ void ads1256_print_data(ads1256_device_t device)
     ESP_LOGI(TAG, "Weight Channel 3: %.2f", data.weight[3]);
 }
 
+bool ads1256_start_continuous_read(ads1256_device_t device)
+{
+    uint8_t tx_data = RDATAC_COMMAND;
+    return ads1256_single_transmit(device, &tx_data, sizeof(tx_data), NULL, 0);
+}
+
+bool ads1256_stop_continuous_read(ads1256_device_t device)
+{
+    uint8_t tx_data = SDATAC_COMMAND;
+    return ads1256_single_transmit(device, &tx_data, sizeof(tx_data), NULL, 0);
+}
+
+
+bool ads1256_tare(ads1256_device_t device)
+{
+    ads1256_config_t* config;
+    if (!valid_and_set_dev_config(device, &config)) {
+        ESP_LOGE(TAG, "Invalid device configuration for device %d", ads1256_device_to_number(device));
+        return false;
+    }
+
+    ads1256_channel_t channel;
+    if (!get_channel_config(config, &channel, config->active_channel)) {
+        ESP_LOGE(TAG, "Failed to get channel configuration for device %d", ads1256_device_to_number(device));
+        return false;
+    }
+
+    ads1256_data_t data;
+    if (!ads1256_get_data_struct_copy(device, &data)) {
+        ESP_LOGE(TAG, "Failed to get data for device %d", ads1256_device_to_number(device));
+        return false;
+    }
+    int32_t new_zero_offset = (int32_t)(data.weight[config->active_channel] * channel.factor) + channel.zero_offset;
+    
+
+    return ads1256_set_zero_offset(device, new_zero_offset, config->active_channel);
+}

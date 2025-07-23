@@ -77,6 +77,7 @@ typedef struct ads1256_spi_transmit_t
   const uint8_t* tx_data;  
   size_t tx_len;            
   uint8_t cs_pin; 
+  bool rx_enabled;
 } ads1256_spi_transmit_t;
 
 /**

@@ -244,8 +244,13 @@ int ads1256_get_sampes(int argc, char **argv)
 
         // ESP_LOGI(TAG, "Raw signed value: %d", value);
         float weight = 0.0f;
-        uint8_t raw_data;
-        ads1256_get_raw_data(ADS1256_DEVICE_1, &raw_data);
+        uint8_t raw_data[3];
+        ads1256_get_raw_data(ADS1256_DEVICE_1, raw_data);
+        int32_t raw_value = (raw_data[0] << 16) | (raw_data[1] << 8) | raw_data[2];
+        if (raw_value & 0x800000) {
+            raw_value |= 0xFF000000; 
+        }
+        ESP_LOGI(TAG, "Raw signed value: %d", raw_value);
         // ads1256_raw_data_to_weight(&raw_data, ADS1256_DEVICE_1, &weight, 1);
         // ESP_LOGI("CAN_COMMANDS", "Weight from device %d [N], channel %d: %f", ads_device, channel_num, weight);
         // ESP_LOGI("CLI","waga w [n]: %f", weight );
@@ -469,6 +474,72 @@ int print_data(int argc, char **argv) {
     return 0;
 }
 
+int suspend_task(int argc, char **argv) {
+    if(argc != 2) {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+
+    if(device == 1) {
+        dev = ADS1256_DEVICE_1;
+    } else if(device == 2) {
+        dev = ADS1256_DEVICE_2;
+    } else {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+
+    ads1256_suspend_task(dev);
+    return 0;
+}
+
+int resume_task(int argc, char **argv) {
+    if(argc != 2) {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+
+    if(device == 1) {
+        dev = ADS1256_DEVICE_1;
+    } else if(device == 2) {
+        dev = ADS1256_DEVICE_2;
+    } else {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+
+    ads1256_resume_task(dev);
+    return 0;
+}
+
+int dlete_task(int argc, char **argv) {
+    if(argc != 2) {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+
+    if(device == 1) {
+        dev = ADS1256_DEVICE_1;
+    } else if(device == 2) {
+        dev = ADS1256_DEVICE_2;
+    } else {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+
+    ads1256_delete_task(dev);
+    return 0;
+}
+
 int help_cmd(int argc, char **argv);
 
 
@@ -483,7 +554,7 @@ int help_cmd(int argc, char **argv);
 {"sd_read_file", "Print file on std out from sd. Usage: sd_read_file [file_path]", NULL, read_sd_file, NULL},
 {"sd_clear_file", "Empty a file on the SD card. Usage: sd_clear_file [file_path]", NULL, empty_sd_file, NULL},
 {"ads_samples", "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]", NULL,ads1256_get_sampes, NULL },
-{"ads_change_mux", "Change ads channel. Usage: ads_change_mux [dev_num] [1-4]", NULL, change_mux_channel, NULL},
+{"ads_change_mux", "Change ads channel. Usage: ads_change_mux [dev_num] [0-3]", NULL, change_mux_channel, NULL},
 {"ads_read_cal", "Read calibration registers. Usage: ads_read_cal", NULL, read_cal_registers, NULL},
 {"ads_calibrate", "Calibrate device on current channel. Usage: ads_calibrate [dev_num]", NULL, calibrate_device, NULL},
 {"ads_reset", "Reset ads device. Usage: ads_reset [dev_num]", NULL, ads1256_reset_cli,NULL},
@@ -492,6 +563,10 @@ int help_cmd(int argc, char **argv);
 {"dev_info", "Display device configuration information. Usage: dev_info [dev_num]", NULL, dev_info, NULL},
 {"ads_print_data", "Print data from ADS1256 device. Usage: ads_print_data [dev_num]", NULL, print_data, NULL},
 {"help", "Display this help message", NULL, help_cmd, NULL},
+{"ads_suspend_task", "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]", NULL, suspend_task, NULL},
+{"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL},
+{"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL},
+
 
 
 

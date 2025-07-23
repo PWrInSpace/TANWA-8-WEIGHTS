@@ -74,8 +74,8 @@ esp_err_t can_set_ads_ch(uint8_t *data, uint8_t length);
 /*
 * COM -> WEIGHT_BOARD
 *
-* Data length = 5 bytes
-* data [0] = dev_num (1 or 2) | data [1..4] = offset (int32_t)
+* Data length = 6 bytes
+* data [0] = dev_num (1 or 2) | data[1] = channel_num (0-3) | data [2..5] = offset (int32_t)
 */
 esp_err_t can_set_ads_offset(uint8_t *data, uint8_t length);
 
