@@ -190,8 +190,9 @@ void ads1256_start_readc(ads1256_device_t device)
         read_mux_stop_flag = true;
         vTaskDelay(pdMS_TO_TICKS(50)); // Wait for any ongoing read_mux task to finish
     }
+
+    ads1256_hamownia_drut();
     
-    ads1256_change_channel(device, HAMOWNIA_CHANNEL);
     ads1256_start_continuous_read(device);
     vTaskDelay(pdMS_TO_TICKS(1));
 

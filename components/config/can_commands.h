@@ -12,7 +12,7 @@ typedef enum {
     CAN_SET_ADS_CH	                =   0x3FA0,
     CAN_SET_ADS_OFFSET	            =   0x3F90,
     CAN_GET_ADS_CH_ALL_WEIGHT       =	0x2F90,
-    CAN_GET_ADS_CH_WEIGHT	        =   0x2F80,
+    CAN_GET_ADS_CH_WEIGHT	        =   0x0F80,
     CAN_GET_WEIGHTS 	            =   0x2F40,
 
     // WEIGHT_BOARD -> COM
@@ -22,7 +22,7 @@ typedef enum {
     CAN_SEND_ADS1_ALL_CH_WEIGHT2    =	0x3F13,
     CAN_SEND_ADS2_ALL_CH_WEIGHT1    =	0x3F14,
     CAN_SEND_ADS2_ALL_CH_WEIGHT2    =	0x3F15,
-    CAN_SEND_ADS_CH_WEIGHT	        =   0x3F20,
+    CAN_SEND_ADS_CH_WEIGHT	        =   0x0F20,
     CAN_SEND_WEIGHTS	            =   0x3F30
 
 

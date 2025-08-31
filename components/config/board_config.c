@@ -60,6 +60,32 @@ esp_err_t board_config_init(void) {
         return err;
     }
 
+    err = mcu_spi_init();
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "SPI initialization failed");
+        return err;
+    }
+    if(_ads1256_add_device() != true) {
+        ESP_LOGE(TAG, "Failed to add ADS1256 device");
+        return ESP_FAIL;
+    }
+
+
+
+    if(!timers_init())
+    {
+        ESP_LOGE(TAG, "Failed to initialize timers");
+        return ESP_FAIL;
+    }
+    
+    if(!ads1256_task_init())
+    {
+        ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
+        return ESP_FAIL;
+    }
+
+
     err = mcu_twai_init();
 
     if (err != ESP_OK) {
@@ -79,18 +105,6 @@ esp_err_t board_config_init(void) {
         return err;
     }
 
-    err = mcu_spi_init();
-
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "SPI initialization failed");
-        return err;
-    }
-
-    if(_ads1256_add_device() != true) {
-        ESP_LOGE(TAG, "Failed to add ADS1256 device");
-        return ESP_FAIL;
-    }
-
     err = sd_task_init();
 
     if (err != ESP_OK) {
@@ -98,17 +112,7 @@ esp_err_t board_config_init(void) {
         return err;
     }
 
-    if(!timers_init())
-    {
-        ESP_LOGE(TAG, "Failed to initialize timers");
-        return ESP_FAIL;
-    }
 
-    if(!ads1256_task_init())
-    {
-        ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
-        return ESP_FAIL;
-    }
     
     return ESP_OK;
 

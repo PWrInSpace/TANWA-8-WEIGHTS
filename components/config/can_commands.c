@@ -27,25 +27,25 @@ bool valid_and_set_device(uint8_t device_num, ads1256_device_t *device) {
     } else if (device_num == 2) {
         *device = ADS1256_DEVICE_2;
     } else {
-        ESP_LOGE(TAG, "Invalid device number: %d", device_num);
+        // ESP_LOGE(TAG, "Invalid device number: %d", device_num);
         return false;
     }
     return true;
 }
 
-bool valid_and_set_time(uint8_t* time_tab, uint16_t *time) {
-    if (time_tab == NULL || time == NULL) {
-        ESP_LOGE(TAG, "Invalid time pointer");
-        return false;
-    }
-    *time = (time_tab[0] << 8) | time_tab[1];
+// bool valid_and_set_time(uint8_t* time_tab, uint16_t *time) {
+//     if (time_tab == NULL || time == NULL) {
+//         ESP_LOGE(TAG, "Invalid time pointer");
+//         return false;
+//     }
+//     *time = (time_tab[0] << 8) | time_tab[1];
 
-    if(*time < 1 || *time > 600) {
-        ESP_LOGE(TAG, "Invalid time value: %d", *time);
-        return false;
-    }
-    return true;
-}
+//     if(*time < 1 || *time > 600) {
+//         ESP_LOGE(TAG, "Invalid time value: %d", *time);
+//         return false;
+//     }
+//     return true;
+// }
 
 bool valid_and_set_channel(uint8_t channel_num, uint8_t *channel) {
     if (channel_num > 3) {
@@ -108,10 +108,11 @@ esp_err_t can_start_measure(uint8_t *data, uint8_t length)
         return ESP_FAIL;
     }
 
-    if(!valid_and_set_time(&data[1], &time)) {
-        return ESP_FAIL;
-    }
-    
+    // if(!valid_and_set_time(&data[1], &time)) {
+    //     return ESP_FAIL;
+    // }
+    memcpy(&time, &data[1], sizeof(uint16_t));
+
     start_readc_task(ads_device, time);
     return ESP_OK;
 }
@@ -267,33 +268,58 @@ esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length)
     * data[1] = channel_num (0-3)
     */
 
-    ads1256_device_t ads_device;
-    uint8_t channel_num;
+    // ads1256_device_t ads_device;
+    // uint8_t channel_num;
 
-    if(!valid_data_length(length, 2)) {
-        return ESP_ERR_INVALID_ARG;
-    }
+    // ESP_LOGI(TAG, "can_get_ads_ch_weight called with data[0..7] =  %d %d %d %d %d %d %d %d", 
+            //  data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+    // ESP_LOGI(TAG, "can_get_ads_ch_weight called");
+    // if(!valid_data_length(length, 0)) {
+    //     return ESP_ERR_INVALID_ARG;
+    // }
 
-    if(!valid_and_set_device(data[0], &ads_device)) {
-        return ESP_FAIL;
-    }
+    // if(!valid_and_set_device(data[0], &ads_device)) {
+    //     return ESP_FAIL;
+    // }
 
-    if(!valid_and_set_channel(data[1], &channel_num)) {
-        return ESP_FAIL;
-    }
+    // if(!valid_and_set_channel(data[1], &channel_num)) {
+    //     return ESP_FAIL;
+    // }
 
 
     ads1256_data_t ads_data;
-    if(!ads1256_get_data_struct_copy(ads_device, &ads_data)) {
+    if(!ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &ads_data)) {
         ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_1");
         return ESP_FAIL;
     }
 
-    float weight = ads_data.weight[channel_num];
+    float weight0 = ads_data.weight[0];
+    float weight1 = ads_data.weight[1];
+    float weight2 = ads_data.weight[2];
+    float weight3 = ads_data.weight[3];
 
-    uint8_t resp[4];
-    memcpy(resp, &weight, sizeof(weight));
-    esp_err_t err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp, sizeof(resp));
+
+    uint8_t resp0[6];
+    uint8_t resp1[6];
+    uint8_t resp2[6];
+    uint8_t resp3[6];
+    memcpy(resp0, &weight2, sizeof(weight0));
+    resp0[4] = 1;
+    resp0[5] = 0;
+    esp_err_t err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp0, sizeof(resp0));
+    memcpy(resp1, &weight2, sizeof(weight0));
+    resp1[4] = 1;
+    resp1[5] = 1;
+    err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp1, sizeof(resp1));
+    memcpy(resp2, &weight0, sizeof(weight0));
+    resp2[4] = 1;
+    resp2[5] = 2;
+    err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp2, sizeof(resp2));
+    memcpy(resp3, &weight3, sizeof(weight0));
+    resp3[4] = 1;
+    resp3[5] = 3;
+    err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp3, sizeof(resp3));
+    ESP_LOGI(TAG, "resp3: %d %d %d %d %d %d", resp3[0], resp3[1], resp3[2], resp3[3], resp3[4], resp3[5]);
     return err;
 }
 

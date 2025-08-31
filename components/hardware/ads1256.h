@@ -152,7 +152,7 @@ bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value
 bool ads1256_stop_continuous_read(ads1256_device_t device);
 bool ads1256_start_continuous_read(ads1256_device_t device);
 bool ads1256_get_data_struct_copy(ads1256_device_t device, ads1256_data_t* data);
-
+bool ads1256_hamownia_drut();
 bool ads1256_set_zero_offset(ads1256_device_t device, int32_t zero_offset, uint8_t channel_num);
 
 void ads1256_get_config_info(ads1256_device_t device);

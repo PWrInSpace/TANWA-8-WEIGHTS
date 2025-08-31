@@ -13,18 +13,26 @@ TaskHandle_t DRDY2_task = NULL;
 SemaphoreHandle_t data_dev1_mutex = NULL;
 SemaphoreHandle_t data_dev2_mutex = NULL;
 
-ads1256_channel_t ads1256_channels_dev1[4]  = {
-    {CHANNEL_0, 0, 1.0f, {0x3B, 0xF1, 0xFF}, {0x0A, 0x2E, 0x2F}},
+ads1256_channel_t ads1256_hamownia[4]  = {
     {CHANNEL_1, 1935, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
-    {CHANNEL_2, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
-    {CHANNEL_3, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}}
+    // {CHANNEL_2, -3400, -32.5f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}, //moj 2
+    // {CHANNEL_3, -10000, -33.1f, {0x17, 0xF6, 0xFF}, {0x53, 0xBB, 0x49}}, //moj 3
+
+};
+
+ads1256_channel_t ads1256_channels_dev1[4]  = {
+    {CHANNEL_0, -10000, -3.31f, {0x17, 0xF6, 0xFF}, {0x53, 0xBB, 0x49}},
+    // {CHANNEL_1, 1935, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
+    {CHANNEL_1, 0, 1.0f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
+    {CHANNEL_2, 3500, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}},
+    {CHANNEL_3, -3400, -3.25f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}
 };
 
 ads1256_channel_t ads1256_channels_dev2[4] = {
     {CHANNEL_0, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
     {CHANNEL_1, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
     {CHANNEL_2, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
-    {CHANNEL_3, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}}
+    {CHANNEL_3, -3400, -32.5f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}
 };
 
 
@@ -741,4 +749,15 @@ bool ads1256_tare(ads1256_device_t device)
     
 
     return ads1256_set_zero_offset(device, new_zero_offset, config->active_channel);
+}
+
+bool ads1256_hamownia_drut()
+{
+    ads1256_config_t* config = &ads1256_config_dev1;
+    ads1256_channel_t* channel = &ads1256_hamownia[0];
+
+    ads1256_set_value(MUX_REGISTER, channel->channel_hex, ADS1256_DEVICE_1);
+    ads1256_set_calibration_registers(ADS1256_DEVICE_1, channel->OFC_REG, channel->FSC_REG);
+
+    return true;
 }

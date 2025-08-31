@@ -118,7 +118,7 @@ esp_err_t can_task_init(void) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    if(xTaskCreatePinnedToCore(can_task, "CAN Task", CAN_TASK_STACK_SIZE, NULL, CAN_TASK_PRIORITY, &gb.task_handle, CAN_TASK_CORE_ID) != pdPASS) {
+    if(xTaskCreatePinnedToCore(can_task, "CAN Task", CAN_TASK_STACK_SIZE, NULL, 9, &gb.task_handle, CAN_TASK_CORE_ID) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create CAN task");
         return ESP_FAIL;
     }
