@@ -57,14 +57,17 @@ bool SD_mount(sd_card_t *sd_card) {
   sdmmc_host_t host = SDMMC_HOST_DEFAULT();
 
   // KONFIGURACJA PINÓW TWOICH
-  sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-  slot_config.width = 4;
-  slot_config.clk = 14;  // twój CLK
-  slot_config.cmd = 2;   // twój CMD
-  slot_config.d0  = 12;  // twój D0
-  slot_config.d1  = 5;   // twój D1
-  slot_config.d2  = 1;  // twój D2
-  slot_config.d3  = 21;  // twój D3
+  sdmmc_slot_config_t slot_config = {
+    .clk = 21,
+    .cmd = 14,
+    .d0  = 47,
+    .d1  = 48,
+    .d2  = 12,
+    .d3  = 13,
+    .cd  = -1,   // brak Card Detect
+    .wp  = -1,   // brak Write Protect
+    .width = 4,
+};
 
   // WŁĄCZENIE WEWNĘTRZNYCH PULLUP
   slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
