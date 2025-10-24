@@ -311,7 +311,7 @@ esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length)
     resp1[4] = 1;
     resp1[5] = 1;
     err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp1, sizeof(resp1));
-    memcpy(resp2, &weight0, sizeof(weight0));
+    memcpy(resp2, &weight3, sizeof(weight0));
     resp2[4] = 1;
     resp2[5] = 2;
     err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp2, sizeof(resp2));

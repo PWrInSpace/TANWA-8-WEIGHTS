@@ -264,6 +264,46 @@ int ads1256_get_sampes(int argc, char **argv)
     return 0;
 }
 
+int read_id(int argc, char **argv)
+{
+    if(argc != 2)
+    {
+        ESP_LOGE(TAG, "Usage: command [dev_num]");
+        return -1;
+    }
+
+    int device = atoi(argv[1]);
+    ads1256_device_t dev;
+
+    if(device == 1)
+    {
+        dev = ADS1256_DEVICE_1;
+    }
+    else if(device == 2)
+    {
+        dev = ADS1256_DEVICE_2;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        return -1;
+    }
+
+    uint8_t id;
+    for(int i =0; i<50; i++)
+    {
+        if(!ads1256_read_id(dev, &id))
+        {
+            ESP_LOGE(TAG, "Failed to read ID from device %d", device);
+            return -1;
+        }
+        esp_rom_delay_us(10);
+    }
+
+    ESP_LOGI(TAG, "Device %d ID: 0x%02X", device, id);
+    return 0;
+}
+
 int dev_info(int argc, char **argv)
 {
     if(argc != 2)
@@ -566,6 +606,7 @@ int help_cmd(int argc, char **argv);
 {"ads_suspend_task", "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]", NULL, suspend_task, NULL, NULL, NULL},
 {"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL, NULL, NULL},
 {"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL, NULL, NULL},
+{"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL}
 
 
 

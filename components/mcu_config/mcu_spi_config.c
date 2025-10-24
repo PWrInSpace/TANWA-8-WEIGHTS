@@ -90,7 +90,6 @@ bool _ads1256_spi_transmit(ads1256_spi_transmit_t* ads_transmit, uint8_t* rx_dat
 
   xSemaphoreTake(mutex_spi, portMAX_DELAY);
   gpio_set_level(ads_transmit->cs_pin, 0);
-
   res = spi_device_transmit(spi_config.spi_ads1256_handle, &tx);
   if (res != ESP_OK) {
       ESP_LOGE(TAG, "SPI TX failed: %s", esp_err_to_name(res));
