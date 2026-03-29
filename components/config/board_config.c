@@ -30,6 +30,7 @@
 #include "ads1256_task.h"
 #include "timers_config.h"
 #include "ads1256_task.h"
+#include "sd_task.h"
 
 
 #define TAG "BOARD_CONFIG"
@@ -111,6 +112,8 @@ esp_err_t board_config_init(void) {
         ESP_LOGE(TAG, "SD task initialization failed");
         return err;
     }
+
+    run_weight_sd_task();
 
 
     

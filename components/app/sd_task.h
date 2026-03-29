@@ -17,5 +17,7 @@ bool run_readc_sd_task();
 bool print_file(const char* path);
 bool empty_file(const char* path);
 void test(void *arg);
+void run_weight_sd_task();
+void delete_weight_sd_task();
 
 #endif

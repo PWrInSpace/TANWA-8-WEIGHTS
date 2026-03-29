@@ -9,6 +9,7 @@
 #define TAG "SD_TASK"
 static sd_card_t sd_card;
 TaskHandle_t sd_task = NULL;
+TaskHandle_t weight_sd_task = NULL;
 volatile bool new_filename_flag = false;
 
 
@@ -119,6 +120,30 @@ bool save_buffer_as_binary(const char* path, readc_frame_t* buffer, size_t lengt
     return true;
 }
 
+bool save_header_as_text(const char* path, const char* header) {
+    FILE* f = fopen(path, "a");  // append text
+    if (!f) {
+        ESP_LOGE("SDCARD", "Failed to open %s for writing", path);
+        return false;
+    }
+    return true;
+}
+
+bool save_weight_as_text(const char* path, float weight) {
+    FILE* f = fopen(path, "a");  // append text
+    if (!f) {
+        ESP_LOGE("SDCARD", "Failed to open %s for writing", path);
+        return false;
+    }
+
+    fprintf(f, "%f\n", weight);
+    fclose(f);
+
+    ESP_LOGI("SDCARD", "Weight saved as text to %s: %f", path, weight);
+    return true;
+}
+
+
 void save_buffer(const char* path, readc_frame_t *buffer, size_t length) {
     ESP_LOGI(TAG, "Saving buffer to 4%s", path);
     if (sd_card.mounted) {
@@ -130,6 +155,54 @@ void save_buffer(const char* path, readc_frame_t *buffer, size_t length) {
         }
     } else {
         ESP_LOGW(TAG, "SD card is not mounted, skipping save operation");
+    }
+}
+
+void save_weight_task(void *arg)
+{
+    char file_path[64];
+     get_next_log_filename(file_path, sizeof(file_path));
+     ESP_LOGI(TAG, "Saving weight data to %s", file_path);
+
+     save_header_as_text(file_path, "Weight Data\n");
+
+     while (1)
+     {
+        ads1256_data_t data;
+        if(ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &data))
+        {            
+            save_weight_as_text(file_path, data.weight[0]);
+        } 
+    vTaskDelay(pdMS_TO_TICKS(1000));    
+
+     }
+}  
+
+void run_weight_sd_task()
+{
+    ESP_LOGI("SD_TASK", "Starting SD card weight save task");
+    BaseType_t result = xTaskCreate(
+        save_weight_task,
+        "save_weight_task",
+        4096,
+        NULL,
+        5,
+        &weight_sd_task
+    );
+
+    if (result != pdPASS) {
+        ESP_LOGE("SD_TASK", "Failed to create save_weight_task");
+    }
+}
+
+void delete_weight_sd_task()
+{
+    if (weight_sd_task != NULL) {
+        vTaskDelete(weight_sd_task);
+        weight_sd_task = NULL;
+        ESP_LOGI("SD_TASK", "Weight save task deleted successfully");
+    } else {
+        ESP_LOGW("SD_TASK", "Weight save task is not running");
     }
 }
 
@@ -191,6 +264,8 @@ void save_ads1256_buffor_task(void *arg)
 
 bool run_readc_sd_task()
 {
+    delete_weight_sd_task(); 
+
     ESP_LOGI("SD_TASK", "Starting SD card readc task");
     BaseType_t result = xTaskCreate(
         save_ads1256_buffor_task,
