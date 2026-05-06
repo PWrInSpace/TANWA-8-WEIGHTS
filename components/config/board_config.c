@@ -31,6 +31,7 @@
 #include "timers_config.h"
 #include "ads1256_task.h"
 #include "sd_task.h"
+#include "flash.h"
 
 
 #define TAG "BOARD_CONFIG"
@@ -86,6 +87,12 @@ esp_err_t board_config_init(void) {
         return ESP_FAIL;
     }
 
+    // err = flash_init();
+
+    // if (err != ESP_OK) {
+    //     ESP_LOGE(TAG, "Flash/NVS initialization failed");
+    //     return err;
+    // }
 
     err = mcu_twai_init();
 
