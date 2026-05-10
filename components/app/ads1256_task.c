@@ -217,8 +217,10 @@ void ads1256_data_from_channels(void*  pvParameters)
     free(args);
 
     ads1256_data_t data = {{0.0f, 0.0f, 0.0f, 0.0f}};
+    ads1256_data_t sample_batch[ADS1256_UPDATE_DATA_AVG_SAMPLES];
     read_mux_stop_flag = false;
     uint8_t iterator = 0;
+    uint8_t batch_index = 0;
 
     while (!read_mux_stop_flag)
     {
@@ -229,7 +231,11 @@ void ads1256_data_from_channels(void*  pvParameters)
         if(iterator >= 4)
         {
             iterator = 0;
-            ads1256_update_data_struct(device, &data);
+            sample_batch[batch_index++] = data;
+            if (batch_index >= ADS1256_UPDATE_DATA_AVG_SAMPLES) {
+                ads1256_update_data_struct(device, sample_batch, ADS1256_UPDATE_DATA_AVG_SAMPLES);
+                batch_index = 0;
+            }
         }
     }
 

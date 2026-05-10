@@ -32,9 +32,15 @@ ads1256_channel_t ads1256_channels_dev1[4]  = { //dzialanie z com xd
     {CHANNEL_0, 0, 1.0f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}},
     // {CHANNEL_1, 1935, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
     {CHANNEL_1, 0, 1.0f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}, //hamownia
-    {CHANNEL_2, 300, -136.6f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //matka channel 1(2) xd
+    {CHANNEL_2, -5000, -3.01f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //matka channel 1(2) xd
     {CHANNEL_3, -4570, -2.9833f, {0xCF, 0xFE, 0xFF}, {0x3B, 0xAF, 0x49}}
 };
+
+//(odczyt - a)/b 
+// 0 kg --> 13604
+// 55.1kg --> 170000  3.085
+// 61.1kg --> 189500  3.101
+// 
 
 ads1256_channel_t ads1256_channels_dev2[4] = {
     {CHANNEL_0, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
@@ -662,20 +668,29 @@ void ads1256_get_config_info(ads1256_device_t device)
     }
 }
 
-void ads1256_update_data_struct(ads1256_device_t device, ads1256_data_t* data)
+void ads1256_update_data_struct(ads1256_device_t device, const ads1256_data_t* samples, size_t num_samples)
 {
-    if (data == NULL) {
-        ESP_LOGE(TAG, "Invalid data pointer");
+    if (samples == NULL || num_samples == 0) {
+        ESP_LOGE(TAG, "Invalid samples or count");
         return;
+    }
+
+    ads1256_data_t averaged;
+    for (int ch = 0; ch < 4; ch++) {
+        double sum = 0.0;
+        for (size_t i = 0; i < num_samples; i++) {
+            sum += (double)samples[i].weight[ch];
+        }
+        averaged.weight[ch] = (float)(sum / (double)num_samples);
     }
 
     if(device == ADS1256_DEVICE_1) {
         xSemaphoreTake(data_dev1_mutex, portMAX_DELAY);
-        memcpy(ads1256_data_dev1.weight, data->weight, sizeof(data->weight));
+        memcpy(ads1256_data_dev1.weight, averaged.weight, sizeof(averaged.weight));
         xSemaphoreGive(data_dev1_mutex);
     } else if(device == ADS1256_DEVICE_2) {
         xSemaphoreTake(data_dev2_mutex, portMAX_DELAY);
-        memcpy(ads1256_data_dev2.weight, data->weight, sizeof(data->weight));
+        memcpy(ads1256_data_dev2.weight, averaged.weight, sizeof(averaged.weight));
         xSemaphoreGive(data_dev2_mutex);
     } else {
         ESP_LOGE(TAG, "Invalid device number: %d", ads1256_device_to_number(device));

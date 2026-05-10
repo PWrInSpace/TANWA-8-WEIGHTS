@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -126,6 +127,9 @@ typedef struct ads1256_data_t
     float weight[4]; 
 } ads1256_data_t;
 
+/** Liczba pełnych przebiegów 4 kanałów uśrednianych w ads1256_update_data_struct. */
+#define ADS1256_UPDATE_DATA_AVG_SAMPLES 100
+
 extern SemaphoreHandle_t data_dev1_mutex;
 extern SemaphoreHandle_t data_dev2_mutex;
 
@@ -156,6 +160,6 @@ bool ads1256_hamownia_drut();
 bool ads1256_set_zero_offset(ads1256_device_t device, int32_t zero_offset, uint8_t channel_num);
 
 void ads1256_get_config_info(ads1256_device_t device);
-void ads1256_update_data_struct(ads1256_device_t device, ads1256_data_t* data);
+void ads1256_update_data_struct(ads1256_device_t device, const ads1256_data_t* samples, size_t num_samples);
 void ads1256_print_data(ads1256_device_t device);
 #endif

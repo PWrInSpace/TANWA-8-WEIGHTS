@@ -113,14 +113,14 @@ esp_err_t board_config_init(void) {
         return err;
     }
 
-    err = sd_task_init();
+    // err = sd_task_init();
 
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "SD task initialization failed");
-        return err;
-    }
+    // if (err != ESP_OK) {
+    //     ESP_LOGE(TAG, "SD task initialization failed");
+    //     return err;
+    // }
 
-    run_weight_sd_task();
+    // run_weight_sd_task();
 
 
     
