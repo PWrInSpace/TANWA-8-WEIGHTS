@@ -20,6 +20,7 @@
 #include "sd_task.h"
 #include "ads1256_task.h"
 #include <string.h>
+#include <stdlib.h>
 
 #define TAG "CONSOLE_CONFIG"
 
@@ -46,6 +47,51 @@ int reset_device(int argc, char **argv) {
     esp_restart();
     return 0;
 }
+
+int tare_cmd(int argc, char **argv) {
+    if (argc != 1) {
+        ESP_LOGE(TAG, "Usage: tare");
+        return -1;
+    }
+
+    if (!ads1256_tare_all(ADS1256_DEVICE_1)) {
+        ESP_LOGE(TAG, "Tare failed");
+        return -1;
+    }
+
+    ESP_LOGI(TAG, "Tare complete");
+    return 0;
+}
+
+int calibrate_cmd(int argc, char **argv){
+    if(argc != 3) {
+        ESP_LOGE(TAG, "Usage: calibrate <channel> <weight>");
+        return -1;
+    }
+
+    int channel = atoi(argv[1]);
+    float weight = (float)atof(argv[2]);
+
+    if (channel < 0 || channel > 3){
+        ESP_LOGE(TAG, "Channel must be in range 0...3");
+        return -1;
+    }
+
+    if (weight<=0.0f){
+        ESP_LOGE(TAG,"Weight must be > 0 (use tare for zero weight)");
+        return -1;
+    }
+
+    if (!ads1256_calibrate_channel(ADS1256_DEVICE_1,(uint8_t)channel, weight)){
+        ESP_LOGE(TAG, "Calibration failed");
+        return -1;
+    }
+
+    ESP_LOGI(TAG, "Calibration compelte");
+    return 0;
+
+}
+
 int read_mux_samples(int argc, char **argv) {
     if(argc != 3)
     {
@@ -606,7 +652,9 @@ int help_cmd(int argc, char **argv);
 {"ads_suspend_task", "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]", NULL, suspend_task, NULL, NULL, NULL},
 {"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL, NULL, NULL},
 {"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL, NULL, NULL},
-{"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL}
+{"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
+{"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
+{"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL}
 
 
 

@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include <string.h>
+#include "flash.h"
 
 #define TAG "ads1256"
 
@@ -518,6 +519,26 @@ bool ads1256_init(ads1256_device_t device)
         return false;
     }
 
+    data_config_t cfg;
+    if (flash_get_runtime_config(&cfg) == ESP_OK) {
+        if(device == ADS1256_DEVICE_1) {
+            ads1256_channels_dev1[0].zero_offset = cfg.weight_cfg.zero_offset_1;
+            ads1256_channels_dev1[0].factor      = cfg.weight_cfg.factor_1;
+            
+            ads1256_channels_dev1[1].zero_offset = cfg.weight_cfg.zero_offset_2;
+            ads1256_channels_dev1[1].factor      = cfg.weight_cfg.factor_2;
+            
+            ads1256_channels_dev1[2].zero_offset = cfg.weight_cfg.zero_offset_3;
+            ads1256_channels_dev1[2].factor      = cfg.weight_cfg.factor_3;
+            
+            ads1256_channels_dev1[3].zero_offset = cfg.weight_cfg.zero_offset_4;
+            ads1256_channels_dev1[3].factor      = cfg.weight_cfg.factor_4;
+            ESP_LOGI("ADS1256", "Loaded weight calibration from NVS");
+        }
+    } else {
+        ESP_LOGE("ADS1256", "Failed to load weight calibration from NVS, using defaults!");
+    }
+
     if(ads1256_reset(device))
     {
         ESP_LOGI("ADS1256", "ADS1256 reset successfully");
@@ -773,6 +794,125 @@ bool ads1256_tare(ads1256_device_t device)
 
     return ads1256_set_zero_offset(device, new_zero_offset, config->active_channel);
 }
+
+bool ads1256_tare_all(ads1256_device_t device){
+    if(device != ADS1256_DEVICE_1){
+        ESP_LOGE(TAG, "tare supports only DEV1");
+        return false;
+    }
+
+    ads1256_config_t* config;
+    if(!valid_and_set_dev_config(device,&config)){
+        ESP_LOGE(TAG,"Invalid device config for device %d",ads1256_device_to_number(device));
+        return false;
+    }
+
+    ads1256_data_t data;
+    if(!ads1256_get_data_struct_copy(device, &data)){
+        ESP_LOGE(TAG,"Failed to read data for tare");
+        return false;
+    }
+
+    for (int ch=0;ch<4;ch++){
+        float factor = config->channels[ch].factor;
+        int32_t zero = config->channels[ch].zero_offset;
+        int32_t new_zero = (int32_t)(data.weight[ch]*factor) +zero;
+        config->channels[ch].zero_offset = new_zero;
+    }
+
+    data_config_t cfg;
+    if (flash_get_runtime_config(&cfg) !=ESP_OK){
+        ESP_LOGE(TAG,"Failed to read nvs config");
+        return false;
+    }
+
+    cfg.weight_cfg.zero_offset_1 = config->channels[0].zero_offset;
+    cfg.weight_cfg.zero_offset_2 = config->channels[1].zero_offset;
+    cfg.weight_cfg.zero_offset_3 = config->channels[2].zero_offset;
+    cfg.weight_cfg.zero_offset_4 = config->channels[3].zero_offset;
+    
+    if(flash_edit_config(cfg)!=ESP_OK){
+        ESP_LOGE(TAG,"Failed to update runtime config");
+        return false;
+    }
+
+    if(flash_commit()!=ESP_OK){
+        ESP_LOGE(TAG,"Failed to commit nvs");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Tare complete");
+    return true;
+
+}
+
+
+bool ads1256_calibrate_channel(ads1256_device_t device, uint8_t channel, float weight){
+    if (device!=ADS1256_DEVICE_1){
+        ESP_LOGE(TAG,"calibrate supports only for DEV1");
+        return false;
+    }
+
+    if (channel >3 || weight<=0.0f){
+        ESP_LOGE(TAG,"Invalid channel or weight");
+        return false;
+    }
+
+    ads1256_config_t* config;
+    if(!valid_and_set_dev_config(device,&config)){
+        ESP_LOGE(TAG,"Invalid device config for device %d",ads1256_device_to_number(device));
+        return false;
+    }
+
+    ads1256_data_t data;
+    if(!ads1256_get_data_struct_copy(device,&data)){
+        ESP_LOGE(TAG,"Failed to read data for calubration");
+        return false;
+    }
+
+    //raw_diff=raw-zero_offset=weight_measured*factor
+    float current_factor = config->channels[channel].factor;
+    int32_t raw_diff=(int32_t)(data.weight[channel]*current_factor);
+
+    if (raw_diff==0){
+        ESP_LOGE(TAG,"Raw diff 0, can't calibrate");
+        return false;
+    }
+
+    //factor=(raw-zero offset) / known weight
+    float new_factor = (float)raw_diff / weight;
+    config->channels[channel].factor = new_factor;
+
+    data_config_t cfg;
+    if(flash_get_runtime_config(&cfg)!=ESP_OK){
+        ESP_LOGE(TAG,"Failed to read nvs config");
+        return false;
+    }
+
+    switch(channel){
+        case 0: cfg.weight_cfg.factor_1 = new_factor; break;
+        case 1: cfg.weight_cfg.factor_2 = new_factor; break;
+        case 2: cfg.weight_cfg.factor_3 = new_factor; break;
+        case 3: cfg.weight_cfg.factor_4 = new_factor; break;
+        default: return false;
+    }
+
+    if(flash_edit_config(cfg) !=ESP_OK){
+        ESP_LOGE(TAG,"Failed to update runtime config");
+        return false;
+    }
+
+    if(flash_commit()!=ESP_OK){
+        ESP_LOGE(TAG,"Failed to commit NVS");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Calibration complted: channel %d, factor %.6f", channel, new_factor);
+    return true;
+
+
+}
+
 
 bool ads1256_hamownia_drut()
 {

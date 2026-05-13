@@ -9,10 +9,15 @@
 #define CONFIG_FIELDS \
     DATA(device_id, uint8_t, 1) \
     DATA_ARRAY(device_str, char, 16, "ESP32") \
-    SECTION_BEGIN(valve_cfg) \
-    DATA(zero_offset_2, float, -0.65) \
-    DATA(multiplier_2, float, 12.5) \
-    DATA(calibration_value_1, int32_t, 12345) \
-    SECTION_END(valve_cfg) \
+    SECTION_BEGIN(weight_cfg) \
+    DATA(zero_offset_1, int32_t, 0) \
+    DATA(factor_1, float, 1.0) \
+    DATA(zero_offset_2, int32_t, 0) \
+    DATA(factor_2, float, 1.0) \
+    DATA(zero_offset_3, int32_t, 0) \
+    DATA(factor_3, float, 1.0) \
+    DATA(zero_offset_4, int32_t, 0) \
+    DATA(factor_4, float, 1.0) \
+    SECTION_END(weight_cfg) \
     DATA(operation_mode, char, 'D')
 // jeżeli ktokolwiek usunie tą linie to kompilator zacznie drzeć ryja (chyba że dodasz pustą linię po ostatniej definicji :)
