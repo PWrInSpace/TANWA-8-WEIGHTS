@@ -51,12 +51,12 @@ int reset_device(int argc, char **argv) {
 int tare_cmd(int argc, char **argv) {
     if (argc != 1) {
         ESP_LOGE(TAG, "Usage: tare");
-        return -1;
+        return 0;
     }
 
     if (!ads1256_tare_all(ADS1256_DEVICE_1)) {
         ESP_LOGE(TAG, "Tare failed");
-        return -1;
+        return 0;
     }
 
     ESP_LOGI(TAG, "Tare complete");
@@ -66,7 +66,7 @@ int tare_cmd(int argc, char **argv) {
 int calibrate_cmd(int argc, char **argv){
     if(argc != 3) {
         ESP_LOGE(TAG, "Usage: calibrate <channel> <weight>");
-        return -1;
+        return 0;
     }
 
     int channel = atoi(argv[1]);
@@ -74,17 +74,17 @@ int calibrate_cmd(int argc, char **argv){
 
     if (channel < 0 || channel > 3){
         ESP_LOGE(TAG, "Channel must be in range 0...3");
-        return -1;
+        return 0;
     }
 
     if (weight<=0.0f){
         ESP_LOGE(TAG,"Weight must be > 0 (use tare for zero weight)");
-        return -1;
+        return 0;
     }
 
     if (!ads1256_calibrate_channel(ADS1256_DEVICE_1,(uint8_t)channel, weight)){
         ESP_LOGE(TAG, "Calibration failed");
-        return -1;
+        return 0;
     }
 
     ESP_LOGI(TAG, "Calibration compelte");

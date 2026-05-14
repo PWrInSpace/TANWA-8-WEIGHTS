@@ -520,7 +520,7 @@ bool ads1256_init(ads1256_device_t device)
     }
 
     data_config_t cfg;
-    if (flash_get_runtime_config(&cfg) == ESP_OK) {
+    if (flash_read(&cfg) == ESP_OK) {
         if(device == ADS1256_DEVICE_1) {
             ads1256_channels_dev1[0].zero_offset = cfg.weight_cfg.zero_offset_1;
             ads1256_channels_dev1[0].factor      = cfg.weight_cfg.factor_1;
