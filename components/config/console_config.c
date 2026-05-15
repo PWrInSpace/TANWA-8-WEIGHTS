@@ -20,6 +20,8 @@
 #include "sd_task.h"
 #include "ads1256_task.h"
 #include <string.h>
+#include <stdlib.h>
+#include "flash.h"
 
 #define TAG "CONSOLE_CONFIG"
 
@@ -46,6 +48,86 @@ int reset_device(int argc, char **argv) {
     esp_restart();
     return 0;
 }
+
+int tare_cmd(int argc, char **argv) {
+    if (argc != 1) {
+        ESP_LOGE(TAG, "Usage: tare");
+        return 0;
+    }
+
+    if (!ads1256_tare_all(ADS1256_DEVICE_1)) {
+        ESP_LOGE(TAG, "Tare failed");
+        return 0;
+    }
+
+    ESP_LOGI(TAG, "Tare complete");
+    return 0;
+}
+
+int calibrate_cmd(int argc, char **argv){
+    if(argc != 3) {
+        ESP_LOGE(TAG, "Usage: calibrate <channel> <weight>");
+        return 0;
+    }
+
+    int channel = atoi(argv[1]);
+    float weight = (float)atof(argv[2]);
+
+    if (channel < 0 || channel > 3){
+        ESP_LOGE(TAG, "Channel must be in range 0...3");
+        return 0;
+    }
+
+    if (weight<=0.0f){
+        ESP_LOGE(TAG,"Weight must be > 0 (use tare for zero weight)");
+        return 0;
+    }
+
+    if (!ads1256_calibrate_channel(ADS1256_DEVICE_1,(uint8_t)channel, weight)){
+        ESP_LOGE(TAG, "Calibration failed");
+        return 0;
+    }
+
+    ESP_LOGI(TAG, "Calibration compelte");
+    return 0;
+
+}
+
+static void print_config(const data_config_t *cfg, const char *label) {
+    printf("%s\n", label);
+    flash_print_config(*cfg);
+    printf("\n");
+}
+
+int read_flash_cmd(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    data_config_t data;
+    if (flash_read(&data) != ESP_OK) {
+        printf("Couldn't retrieve data from flash memory\n");
+        return 0;
+    }
+
+    print_config(&data, "Memory contents:");
+    return 0;
+}
+
+int display_config_cmd(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    data_config_t data;
+    if (flash_get_runtime_config(&data) != ESP_OK) {
+        printf("Couldn't retrieve runtime config\n");
+        return 0;
+    }
+
+    print_config(&data, "Runtime config:");
+    return 0;
+}
+
+
 int read_mux_samples(int argc, char **argv) {
     if(argc != 3)
     {
@@ -606,9 +688,11 @@ int help_cmd(int argc, char **argv);
 {"ads_suspend_task", "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]", NULL, suspend_task, NULL, NULL, NULL},
 {"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL, NULL, NULL},
 {"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL, NULL, NULL},
-{"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL}
-
-
+{"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
+{"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
+{"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
+{"read_flash", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
+{"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL}
 
 
 };

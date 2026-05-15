@@ -81,18 +81,19 @@ esp_err_t board_config_init(void) {
         return ESP_FAIL;
     }
     
+    err = flash_init(); //moved it higher to avoid ads1256_task_init reading hard coded data
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Flash/NVS initialization failed");
+        return err;
+    }
+
     if(!ads1256_task_init())
     {
         ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
         return ESP_FAIL;
     }
 
-    // err = flash_init();
-
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(TAG, "Flash/NVS initialization failed");
-    //     return err;
-    // }
 
     err = mcu_twai_init();
 
