@@ -21,6 +21,7 @@
 #include "ads1256_task.h"
 #include <string.h>
 #include <stdlib.h>
+#include "flash.h"
 
 #define TAG "CONSOLE_CONFIG"
 
@@ -91,6 +92,41 @@ int calibrate_cmd(int argc, char **argv){
     return 0;
 
 }
+
+static void print_config(const data_config_t *cfg, const char *label) {
+    printf("%s\n", label);
+    flash_print_config(*cfg);
+    printf("\n");
+}
+
+int read_flash_cmd(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    data_config_t data;
+    if (flash_read(&data) != ESP_OK) {
+        printf("Couldn't retrieve data from flash memory\n");
+        return 0;
+    }
+
+    print_config(&data, "Memory contents:");
+    return 0;
+}
+
+int display_config_cmd(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    data_config_t data;
+    if (flash_get_runtime_config(&data) != ESP_OK) {
+        printf("Couldn't retrieve runtime config\n");
+        return 0;
+    }
+
+    print_config(&data, "Runtime config:");
+    return 0;
+}
+
 
 int read_mux_samples(int argc, char **argv) {
     if(argc != 3)
@@ -654,9 +690,9 @@ int help_cmd(int argc, char **argv);
 {"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL, NULL, NULL},
 {"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
 {"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
-{"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL}
-
-
+{"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
+{"read_flash", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
+{"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL}
 
 
 };
