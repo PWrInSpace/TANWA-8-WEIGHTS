@@ -129,14 +129,18 @@ bool save_header_as_text(const char* path, const char* header) {
     return true;
 }
 
-bool save_weight_as_text(const char* path, float weight) {
+bool save_weight_as_text(const char* path, float weight[], int number_of_channels, uint32_t time_ms) {
     FILE* f = fopen(path, "a");  // append text
     if (!f) {
         ESP_LOGE("SDCARD", "Failed to open %s for writing", path);
         return false;
     }
-
-    fprintf(f, "%f\n", weight);
+    fprintf(f, "%lu", time_ms);
+    int channel;
+    for(channel = 0; channel < number_of_channels; channel++) {
+        fprintf(f, ",%f", weight[channel]);
+    }
+    
     fclose(f);
 
     ESP_LOGI("SDCARD", "Weight saved as text to %s: %f", path, weight);
@@ -165,13 +169,14 @@ void save_weight_task(void *arg)
      ESP_LOGI(TAG, "Saving weight data to %s", file_path);
 
      save_header_as_text(file_path, "Weight Data\n");
-
+    int64_t timer_start = esp_timer_get_time();
      while (1)
      {
         ads1256_data_t data;
         if(ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &data))
-        {            
-            save_weight_as_text(file_path, data.weight[0]);
+        {       
+            timer_current = esp_timer_get_time();     
+            save_weight_as_text(file_path, data.weight, 4, (uint32_t)((timer_current - timer_start)/1000));
         } 
     vTaskDelay(pdMS_TO_TICKS(1000));    
 
