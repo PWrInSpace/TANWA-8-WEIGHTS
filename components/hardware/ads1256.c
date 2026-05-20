@@ -68,13 +68,13 @@ ads1256_config_t ads1256_config_dev2 = {
 ads1256_data_t ads1256_data_dev1;
 ads1256_data_t ads1256_data_dev2;
 
-bool get_channel_config(ads1256_config_t* config, ads1256_channel_t* channel_config, uint8_t channel_num) {
+bool get_channel_config(ads1256_config_t* config, ads1256_channel_t **channel_config, uint8_t channel_num) {
     if (channel_config == NULL || channel_num > 3) {
         ESP_LOGE(TAG, "Invalid channel configuration or channel number");
         return false;
     }
 
-    *channel_config = config->channels[channel_num];
+    *channel_config = &config->channels[channel_num];
     return true;
 }
 
@@ -210,13 +210,13 @@ bool ads1256_set_zero_offset(ads1256_device_t device, int32_t zero_offset, uint8
         return false;
     }
 
-    ads1256_channel_t channel_config;
+    ads1256_channel_t *channel_config = NULL;
     if (!get_channel_config(config, &channel_config, channel_num)) {
         ESP_LOGE(TAG, "Failed to get channel configuration");
         return false;
     }
 
-    return set_zero_offset_calibration(&channel_config, zero_offset);
+    return set_zero_offset_calibration(channel_config, zero_offset);
 }
 
 bool install_isr_service()
@@ -620,7 +620,7 @@ bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value
     }
 
     bool res = true;
-    ads1256_channel_t channel;
+    ads1256_channel_t *channel = NULL;
     int32_t zero_offset;
     float factor;
 
@@ -631,8 +631,8 @@ bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value
     }
 
     res &= get_channel_config(config, &channel, channel_num);
-    res &= get_factor_calibration(&channel, &factor);
-    res &= get_zero_offset_calibration(&channel, &zero_offset);
+    res &= get_factor_calibration(channel, &factor);
+    res &= get_zero_offset_calibration(channel, &zero_offset);
 
     if (!res) {
         ESP_LOGE(TAG, "Failed to get channel configuration for device %d", ads1256_device_to_number(dev));
@@ -778,7 +778,7 @@ bool ads1256_tare(ads1256_device_t device)
         return false;
     }
 
-    ads1256_channel_t channel;
+    ads1256_channel_t *channel = NULL;
     if (!get_channel_config(config, &channel, config->active_channel)) {
         ESP_LOGE(TAG, "Failed to get channel configuration for device %d", ads1256_device_to_number(device));
         return false;
@@ -789,7 +789,7 @@ bool ads1256_tare(ads1256_device_t device)
         ESP_LOGE(TAG, "Failed to get data for device %d", ads1256_device_to_number(device));
         return false;
     }
-    int32_t new_zero_offset = (int32_t)(data.weight[config->active_channel] * channel.factor) + channel.zero_offset;
+    int32_t new_zero_offset = (int32_t)(data.weight[config->active_channel] * channel->factor) + channel->zero_offset;
     
 
     return ads1256_set_zero_offset(device, new_zero_offset, config->active_channel);
