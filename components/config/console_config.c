@@ -127,6 +127,19 @@ int display_config_cmd(int argc, char **argv) {
     return 0;
 }
 
+int save_flash_cmd(int argc, char **argv) {
+    esp_err_t ret;
+    ret = flash_commit();
+
+    if (ret != ESP_OK) {
+        printf("Couldn't save data to flash memory\nErr: %s\n", esp_err_to_name(ret));
+        return 0;
+    }
+
+    printf("Successfully saved data to flash memory\n");
+    return 0;
+}
+
 
 int read_mux_samples(int argc, char **argv) {
     if(argc != 3)
@@ -692,7 +705,8 @@ int help_cmd(int argc, char **argv);
 {"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
 {"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
 {"read_flash", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
-{"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL}
+{"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL},
+{"save_flash", "Saves current runtime config to flash memory.", NULL, save_flash_cmd, NULL, NULL, NULL}
 
 
 };

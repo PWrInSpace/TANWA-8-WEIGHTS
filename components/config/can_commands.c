@@ -319,7 +319,7 @@ esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length)
     resp3[4] = 1;
     resp3[5] = 3;
     err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp3, sizeof(resp3));
-    ESP_LOGI(TAG, "resp3: %d %d %d %d %d %d", resp3[0], resp3[1], resp3[2], resp3[3], resp3[4], resp3[5]);
+  //  ESP_LOGI(TAG, "resp3: %d %d %d %d %d %d", resp3[0], resp3[1], resp3[2], resp3[3], resp3[4], resp3[5]);
     return err;
 }
 
