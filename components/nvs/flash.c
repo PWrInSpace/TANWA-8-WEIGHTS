@@ -5,12 +5,16 @@ static data_config_t runtime_config = {0};
 
 static const char *TAG = "FLASH";
 static SemaphoreHandle_t runtime_mutex = NULL;
-
 esp_err_t flash_init(void) {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
+    }
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "NVS driver initialization failed: 0x%X", ret);
+        return ret;
     }
 
     if (!runtime_mutex) {
@@ -21,14 +25,28 @@ esp_err_t flash_init(void) {
         }
     }
 
-    // IMPORTANT! 
-    // Uncomment following two lines when nvs is run for the first time on pcb:
-    // flash_restore_defaults();
-    // flash_commit();
-    // Run them exactly once and then comment again.
-
+    // Próba odczytu konfiguracji
     ret = flash_read(&runtime_config);
-    return ret;
+    
+    // AUTOMATYCZNE WYKRYWANIE PIERWSZEGO URUCHOMIENIA:
+    if (ret == ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Config not found in NVS. Loading and flashing factory defaults...");
+        
+        flash_restore_defaults(); // Ładuje domyślne struktury do pamięci RAM
+        ret = flash_commit();     // Zapisuje je fizycznie do pamięci NVS
+        
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to save default config to NVS! Error: 0x%X", ret);
+            return ret;
+        }
+    } else if (ret != ESP_OK) {
+        // Jakiś inny, krytyczny błąd odczytu NVS
+        ESP_LOGE(TAG, "Error reading from NVS: 0x%X", ret);
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Flash configuration initialized successfully.");
+    return ESP_OK; // Zwracamy ESP_OK, system może bezpiecznie wstać
 }
 
 esp_err_t flash_restore_defaults(void) {
