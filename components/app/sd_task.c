@@ -126,6 +126,8 @@ bool save_header_as_text(const char* path, const char* header) {
         ESP_LOGE("SDCARD", "Failed to open %s for writing", path);
         return false;
     }
+    fprintf(f, "Time,Channel1,Channel2,Channel3,Channel4");
+    fclose(f);
     return true;
 }
 
