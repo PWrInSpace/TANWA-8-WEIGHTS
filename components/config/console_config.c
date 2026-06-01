@@ -694,16 +694,16 @@ int help_cmd(int argc, char **argv);
 {"ads_calibrate", "Calibrate device on current channel. Usage: ads_calibrate [dev_num]", NULL, calibrate_device, NULL, NULL, NULL},
 {"ads_reset", "Reset ads device. Usage: ads_reset [dev_num]", NULL, ads1256_reset_cli,NULL, NULL, NULL},
 {"ads_set_sps", "Set data rate for ads device. Usage: ads_set_sps [dev_num] [sps_value]", NULL, ads1256_set_sps_cmd, NULL, NULL, NULL},
-{"read_mux_samples", "Read samples from the ADS1256 MUX. Usage: read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples, NULL, NULL, NULL},
-{"dev_info", "Display device configuration information. Usage: dev_info [dev_num]", NULL, dev_info, NULL, NULL, NULL},
+{"ads_read_mux_samples", "Read samples from the ADS1256 MUX. Usage: ads_read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples, NULL, NULL, NULL},
+{"ads_dev_info", "Display device configuration information. Usage: ads_dev_info [dev_num]", NULL, dev_info, NULL, NULL, NULL},
 {"ads_print_data", "Print data from ADS1256 device. Usage: ads_print_data [dev_num]", NULL, print_data, NULL, NULL, NULL},
 {"help", "Display this help message", NULL, help_cmd, NULL, NULL, NULL},
 {"ads_suspend_task", "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]", NULL, suspend_task, NULL, NULL, NULL},
 {"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL, NULL, NULL},
 {"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL, NULL, NULL},
 {"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
-{"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
-{"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
+{"ads_tare", "Zero all sensors. Usage: ads_tare", NULL, tare_cmd, NULL, NULL, NULL},
+{"ads_calibrate_channel", "Calibrate one channel. Usage: ads_calibrate_channel <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
 {"read_flash", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
 {"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL},
 {"save_flash", "Saves current runtime config to flash memory.", NULL, save_flash_cmd, NULL, NULL, NULL}
@@ -711,11 +711,72 @@ int help_cmd(int argc, char **argv);
 
 };
 
-int help_cmd(int argc, char **argv) {
-    ESP_LOGI(TAG, "Available commands:");
-    for (int i = 0; i < sizeof(cmd) / sizeof(cmd[0]); i++) {
-        ESP_LOGI(TAG, "%-16s - %s", cmd[i].command, cmd[i].help);
+static bool starts_with(const char *text, const char *prefix) {
+    return text != NULL && prefix != NULL && strncmp(text, prefix, strlen(prefix)) == 0;
+}
+
+static bool is_ads_command(const esp_console_cmd_t *cmd) {
+    return cmd != NULL && starts_with(cmd->command, "ads_");
+}
+
+static bool is_sd_command(const esp_console_cmd_t *cmd) {
+    return cmd != NULL && starts_with(cmd->command, "sd_");
+}
+
+static bool is_system_command(const esp_console_cmd_t *cmd) {
+    return cmd != NULL && !is_ads_command(cmd) && !is_sd_command(cmd);
+}
+
+static void print_command_section(const char *title,
+                                  bool (*predicate)(const esp_console_cmd_t *),
+                                  const esp_console_cmd_t *cmds,
+                                  size_t cmd_count) {
+    bool printed_any = false;
+
+    printf("========== %s ==========\n", title);
+
+    for (size_t i = 0; i < cmd_count; i++) {
+        if (predicate(&cmds[i])) {
+            printf("%-20s - %s\n", cmds[i].command, cmds[i].help);
+            printed_any = true;
+        }
     }
+
+    if (!printed_any) {
+        printf("(no commands)\n");
+    }
+
+    printf("\n");
+}
+
+
+int help_cmd(int argc, char **argv) {
+    (void)argv;
+
+    if (argc == 1) {
+        size_t cmd_count = sizeof(cmd) / sizeof(cmd[0]);
+
+        ESP_LOGI(TAG, "Available commands:");
+        print_command_section("System", is_system_command, cmd, cmd_count);
+        print_command_section("ADS", is_ads_command, cmd, cmd_count);
+        print_command_section("SD", is_sd_command, cmd, cmd_count);
+        return 0;
+    }
+
+    if (argc == 2) {
+        for (size_t i = 0; i < sizeof(cmd) / sizeof(cmd[0]); i++) {
+            if (strcmp(cmd[i].command, argv[1]) == 0) {
+                printf("%s\n", cmd[i].command);
+                printf("  %s\n", cmd[i].help);
+                return 0;
+            }
+        }
+
+        ESP_LOGE(TAG, "Unknown command: %s", argv[1]);
+        return 0;
+    }
+
+    ESP_LOGE(TAG, "Usage: help [command]");
     return 0;
 }
 
