@@ -88,7 +88,7 @@ int calibrate_cmd(int argc, char **argv){
         return 0;
     }
 
-    ESP_LOGI(TAG, "Calibration compelte");
+    ESP_LOGI(TAG, "Calibration complete");
     return 0;
 
 }
@@ -288,7 +288,7 @@ int change_mux_channel(int argc, char **argv)
 
 }
 
-int ads1256_get_sampes(int argc, char **argv)
+int ads1256_get_samples(int argc, char **argv)
 {
     if(argc != 3)
     {
@@ -317,7 +317,7 @@ int ads1256_get_sampes(int argc, char **argv)
 
     if(samples < 1)
     {
-        ESP_LOGE(TAG, "Number of samples have to be greatcher than 0");
+        ESP_LOGE(TAG, "Number of samples have to be greater than 0");
         return -1;
     }
 
@@ -653,7 +653,7 @@ int resume_task(int argc, char **argv) {
     return 0;
 }
 
-int dlete_task(int argc, char **argv) {
+int delete_task(int argc, char **argv) {
     if(argc != 2) {
         ESP_LOGE(TAG, "Usage: command [dev_num]");
         return -1;
@@ -688,7 +688,7 @@ int help_cmd(int argc, char **argv);
  {"ads_readc", "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task, NULL, NULL, NULL},
 {"sd_read_file", "Print file on std out from sd. Usage: sd_read_file [file_path]", NULL, read_sd_file, NULL, NULL, NULL},
 {"sd_clear_file", "Empty a file on the SD card. Usage: sd_clear_file [file_path]", NULL, empty_sd_file, NULL, NULL, NULL},
-{"ads_samples", "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]", NULL,ads1256_get_sampes, NULL, NULL, NULL},
+{"ads_samples", "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]", NULL,ads1256_get_samples, NULL, NULL, NULL},
 {"ads_change_mux", "Change ads channel. Usage: ads_change_mux [dev_num] [0-3]", NULL, change_mux_channel, NULL, NULL, NULL},
 {"ads_read_cal", "Read calibration registers. Usage: ads_read_cal", NULL, read_cal_registers, NULL, NULL, NULL},
 {"ads_calibrate", "Calibrate device on current channel. Usage: ads_calibrate [dev_num]", NULL, calibrate_device, NULL, NULL, NULL},
@@ -700,7 +700,7 @@ int help_cmd(int argc, char **argv);
 {"help", "Display this help message", NULL, help_cmd, NULL, NULL, NULL},
 {"ads_suspend_task", "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]", NULL, suspend_task, NULL, NULL, NULL},
 {"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL, NULL, NULL},
-{"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL, NULL, NULL},
+{"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, delete_task, NULL, NULL, NULL},
 {"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
 {"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
 {"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},

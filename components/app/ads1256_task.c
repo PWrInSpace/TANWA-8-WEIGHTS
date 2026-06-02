@@ -63,7 +63,7 @@ bool ads1256_task_init(void)
     //     return false;
     // }
 
-    ads1256_start_channel_task(ADS1256_DEVICE_1); //TODO: remove this line leater
+    ads1256_start_channel_task(ADS1256_DEVICE_1); //TODO: remove this line later
 
     return true;
 }

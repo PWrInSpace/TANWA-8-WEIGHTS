@@ -29,8 +29,6 @@
 #include "sd_task.h"
 #include "ads1256_task.h"
 #include "timers_config.h"
-#include "ads1256_task.h"
-#include "sd_task.h"
 #include "flash.h"
 
 
@@ -75,8 +73,7 @@ esp_err_t board_config_init(void) {
 
 
 
-    if(!timers_init())
-    {
+    if(!timers_init()) {
         ESP_LOGE(TAG, "Failed to initialize timers");
         return ESP_FAIL;
     }
@@ -88,8 +85,7 @@ esp_err_t board_config_init(void) {
         return err;
     }
 
-    if(!ads1256_task_init())
-    {
+    if(!ads1256_task_init()) {
         ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
         return ESP_FAIL;
     }

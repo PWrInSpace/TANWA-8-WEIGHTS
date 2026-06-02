@@ -25,7 +25,6 @@ esp_err_t mcu_spi_init(void) {
     ret = spi_bus_initialize(spi_config.host_id, &spi_config.bus_config, SDSPI_DEFAULT_DMA);
     ESP_ERROR_CHECK(ret);
 
-    ESP_ERROR_CHECK(ret);
     mutex_spi = xSemaphoreCreateMutex();
     spi_config.spi_init_flag = true;
     return ret;
