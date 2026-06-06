@@ -25,6 +25,9 @@
 
 #define TAG "CONSOLE_CONFIG"
 
+static int          g_cmd_count = 0;
+static console_cmd_ex_t *g_cmd_list = NULL;
+
 /* HELP FUNCs*/
 
 char* add_sd_prefix(const char* path) {
@@ -1008,27 +1011,24 @@ static void print_command_section(const char *title,
 int help_cmd(int argc, char **argv) {
     (void)argv;
 
-    int cmd_count = 0;
-    console_cmd_ex_t *cmd_list = NULL;
-
-    if (setup_commands(&cmd_count, &cmd_list) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to setup commands");
+    if (g_cmd_list == NULL) {
+        ESP_LOGE(TAG, "Commands not initialized");
         return 0;
     }
 
     if (argc == 1) {
         ESP_LOGI(TAG, "Available commands:");
-        print_command_section("System", is_system_command, cmd_list, cmd_count);
-        print_command_section("ADS", is_ads_command, cmd_list, cmd_count);
-        print_command_section("SD", is_sd_command, cmd_list, cmd_count);
+        print_command_section("System", is_system_command, g_cmd_list, g_cmd_count);
+        print_command_section("ADS", is_ads_command, g_cmd_list, g_cmd_count);
+        print_command_section("SD", is_sd_command, g_cmd_list, g_cmd_count);
         return 0;
     }
 
     if (argc == 2) {
-        for (size_t i = 0; i < (size_t)cmd_count; i++) {
-            if (strcmp(cmd_list[i].cmd.command, argv[1]) == 0) {
-                printf("%s\n", cmd_list[i].cmd.command);
-                printf("  %s\n", cmd_list[i].cmd.help);
+        for (size_t i = 0; i < (size_t)g_cmd_count; i++) {
+            if (strcmp(g_cmd_list[i].cmd.command, argv[1]) == 0) {
+                printf("%s\n", g_cmd_list[i].cmd.command);
+                printf("  %s\n", g_cmd_list[i].cmd.help);
                 return 0;
             }
         }
@@ -1048,16 +1048,13 @@ esp_err_t console_config_init() {
         return ret;
     }
 
-    int cmd_count = 0;
-    console_cmd_ex_t *cmd_list = NULL;
-
-    ret = setup_commands(&cmd_count, &cmd_list);
+    ret = setup_commands(&g_cmd_count, &g_cmd_list);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to setup commands");
         return ret;
     }
 
-    ret = console_register_commands(cmd_list, cmd_count);
+    ret = console_register_commands(g_cmd_list, g_cmd_count);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "%s", esp_err_to_name(ret));
         return ret;
