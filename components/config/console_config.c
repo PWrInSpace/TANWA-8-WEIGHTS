@@ -685,6 +685,7 @@ int help_cmd(int argc, char **argv);
  // Place for the console configuration
 
 static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
+    // clang-format off
     static console_cmd_ex_t cmd[] = {
         {
             .cmd = {
@@ -963,6 +964,7 @@ static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
             .arg_completion = NULL,
         },
     };
+    // clang-format on
 
     *cmd_count = sizeof(cmd) / sizeof(cmd[0]);
     *cmd_list = cmd;
