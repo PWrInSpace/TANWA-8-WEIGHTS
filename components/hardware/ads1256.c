@@ -14,34 +14,14 @@ TaskHandle_t DRDY2_task = NULL;
 SemaphoreHandle_t data_dev1_mutex = NULL;
 SemaphoreHandle_t data_dev2_mutex = NULL;
 
-ads1256_channel_t ads1256_hamownia[4]  = {
-    {CHANNEL_1, 300, -136.6f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
-    // {CHANNEL_2, -3400, -32.5f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}, //moj 2
-    // {CHANNEL_3, -10000, -33.1f, {0x17, 0xF6, 0xFF}, {0x53, 0xBB, 0x49}}, //moj 3
-
-};
-
-// ads1256_channel_t ads1256_channels_dev1[4]  = { //kalibracja
-//     {CHANNEL_0, -10000, -3.31f, {0x17, 0xF6, 0xFF}, {0x53, 0xBB, 0x49}},
-//     // {CHANNEL_1, 1935, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
-//     {CHANNEL_1, -300, -136.6f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
-//     {CHANNEL_2, 10000, -2.9833f, {0xCF, 0xFE, 0xFF}, {0x3B, 0xAF, 0x49}}, //matka channel 1(2) xd
-//     {CHANNEL_3, 0, 1.0f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}
-// };
 
 ads1256_channel_t ads1256_channels_dev1[4]  = { //dzialanie z com xd
     {CHANNEL_0, 0, 1.0f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}},
     // {CHANNEL_1, 1935, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
-    {CHANNEL_1, 0, 1.0f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}, //hamownia
+    {CHANNEL_1, 300, -136.6f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}},//hamownia channel 1
     {CHANNEL_2, -5000, -3.01f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //matka channel 1(2) xd
     {CHANNEL_3, -4570, -2.9833f, {0xCF, 0xFE, 0xFF}, {0x3B, 0xAF, 0x49}}
 };
-
-//(odczyt - a)/b 
-// 0 kg --> 13604
-// 55.1kg --> 170000  3.085
-// 61.1kg --> 189500  3.101
-// 
 
 ads1256_channel_t ads1256_channels_dev2[4] = {
     {CHANNEL_0, 0, 1.0f, {0x48, 0xF1, 0xFF}, {0x9B, 0x31, 0x2F}},
@@ -904,16 +884,4 @@ bool ads1256_calibrate_channel(ads1256_device_t device, uint8_t channel, float w
     return true;
 
 
-}
-
-
-bool ads1256_hamownia_drut()
-{
-    ads1256_config_t* config = &ads1256_config_dev1;
-    ads1256_channel_t* channel = &ads1256_hamownia[0];
-
-    ads1256_set_value(MUX_REGISTER, channel->channel_hex, ADS1256_DEVICE_1);
-    ads1256_set_calibration_registers(ADS1256_DEVICE_1, channel->OFC_REG, channel->FSC_REG);
-
-    return true;
 }
