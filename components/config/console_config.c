@@ -25,6 +25,9 @@
 
 #define TAG "CONSOLE_CONFIG"
 
+static int          g_cmd_count = 0;
+static console_cmd_ex_t *g_cmd_list = NULL;
+
 /* HELP FUNCs*/
 
 char* add_sd_prefix(const char* path) {
@@ -681,52 +684,131 @@ int help_cmd(int argc, char **argv);
 
  // Place for the console configuration
 
- static esp_console_cmd_t cmd [] = {
- // example command:
- // cmd     help description   hint  function      args
- {"reset", "Reset the device", NULL, reset_device, NULL, NULL, NULL},
- {"ads_readc", "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task, NULL, NULL, NULL},
-{"sd_read_file", "Print file on std out from sd. Usage: sd_read_file [file_path]", NULL, read_sd_file, NULL, NULL, NULL},
-{"sd_clear_file", "Empty a file on the SD card. Usage: sd_clear_file [file_path]", NULL, empty_sd_file, NULL, NULL, NULL},
-{"ads_samples", "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]", NULL,ads1256_get_sampes, NULL, NULL, NULL},
-{"ads_change_mux", "Change ads channel. Usage: ads_change_mux [dev_num] [0-3]", NULL, change_mux_channel, NULL, NULL, NULL},
-{"ads_read_cal", "Read calibration registers. Usage: ads_read_cal", NULL, read_cal_registers, NULL, NULL, NULL},
-{"ads_calibrate", "Calibrate device on current channel. Usage: ads_calibrate [dev_num]", NULL, calibrate_device, NULL, NULL, NULL},
-{"ads_reset", "Reset ads device. Usage: ads_reset [dev_num]", NULL, ads1256_reset_cli,NULL, NULL, NULL},
-{"ads_set_sps", "Set data rate for ads device. Usage: ads_set_sps [dev_num] [sps_value]", NULL, ads1256_set_sps_cmd, NULL, NULL, NULL},
-{"read_mux_samples", "Read samples from the ADS1256 MUX. Usage: read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples, NULL, NULL, NULL},
-{"dev_info", "Display device configuration information. Usage: dev_info [dev_num]", NULL, dev_info, NULL, NULL, NULL},
-{"ads_print_data", "Print data from ADS1256 device. Usage: ads_print_data [dev_num]", NULL, print_data, NULL, NULL, NULL},
-{"help", "Display this help message", NULL, help_cmd, NULL, NULL, NULL},
-{"ads_suspend_task", "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]", NULL, suspend_task, NULL, NULL, NULL},
-{"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL, NULL, NULL},
-{"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL, NULL, NULL},
-{"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
-{"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
-{"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
-{"read_flash", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
-{"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL},
-{"save_flash", "Saves current runtime config to flash memory.", NULL, save_flash_cmd, NULL, NULL, NULL}
+static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
+    // clang-format off
+    // Format: { {"command", "help", hint, func, argtable, func_w_context, context}, arg_completion }
+    static console_cmd_ex_t cmd[] = {
+        { {"reset",                  "Reset the device",                                                                  NULL, reset_device,          NULL, NULL, NULL}, NULL },
+        { {"ads_readc",              "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task,            NULL, NULL, NULL}, NULL },
+        { {"sd_read_file",           "Print file on std out from sd. Usage: sd_read_file [file_path]",                   NULL, read_sd_file,          NULL, NULL, NULL}, NULL },
+        { {"sd_clear_file",          "Empty a file on the SD card. Usage: sd_clear_file [file_path]",                    NULL, empty_sd_file,         NULL, NULL, NULL}, NULL },
+        { {"ads_samples",            "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]",        NULL, ads1256_get_sampes,    NULL, NULL, NULL}, NULL },
+        { {"ads_change_mux",         "Change ads channel. Usage: ads_change_mux [dev_num] [0-3]",                        NULL, change_mux_channel,    NULL, NULL, NULL}, NULL },
+        { {"ads_read_cal",           "Read calibration registers. Usage: ads_read_cal",                                  NULL, read_cal_registers,    NULL, NULL, NULL}, NULL },
+        { {"ads_calibrate",          "Calibrate device on current channel. Usage: ads_calibrate [dev_num]",              NULL, calibrate_device,      NULL, NULL, NULL}, NULL },
+        { {"ads_reset",              "Reset ads device. Usage: ads_reset [dev_num]",                                     NULL, ads1256_reset_cli,     NULL, NULL, NULL}, NULL },
+        { {"ads_set_sps",            "Set data rate for ads device. Usage: ads_set_sps [dev_num] [sps_value]",           NULL, ads1256_set_sps_cmd,   NULL, NULL, NULL}, NULL },
+        { {"ads_read_mux_samples",   "Read samples from the ADS1256 MUX. Usage: ads_read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples,      NULL, NULL, NULL}, NULL },
+        { {"ads_dev_info",           "Display device configuration information. Usage: ads_dev_info [dev_num]",          NULL, dev_info,              NULL, NULL, NULL}, NULL },
+        { {"ads_print_data",         "Print data from ADS1256 device. Usage: ads_print_data [dev_num]",                  NULL, print_data,            NULL, NULL, NULL}, NULL },
+        { {"help",                   "Display this help message",                                                        NULL, help_cmd,              NULL, NULL, NULL}, NULL },
+        { {"ads_suspend_task",       "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]",                          NULL, suspend_task,          NULL, NULL, NULL}, NULL },
+        { {"ads_resume_task",        "Resume ADS1256 task. Usage: ads_resume_task [dev_num]",                            NULL, resume_task,           NULL, NULL, NULL}, NULL },
+        { {"ads_delete_task",        "Delete ADS1256 task. Usage: ads_delete_task [dev_num]",                            NULL, dlete_task,            NULL, NULL, NULL}, NULL },
+        { {"ads_read_id",            "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]",                        NULL, read_id,               NULL, NULL, NULL}, NULL },
+        { {"ads_tare",               "Zero all sensors. Usage: ads_tare",                                                NULL, tare_cmd,              NULL, NULL, NULL}, NULL },
+        { {"ads_calibrate_channel",  "Calibrate one channel. Usage: ads_calibrate_channel <channel> <weight>",           NULL, calibrate_cmd,         NULL, NULL, NULL}, NULL },
+        { {"read_flash",             "Reads and displays saved data in flash memory.",                                   NULL, read_flash_cmd,        NULL, NULL, NULL}, NULL },
+        { {"display_config",         "Displays current runtime config (RAM).",                                           NULL, display_config_cmd,    NULL, NULL, NULL}, NULL },
+        { {"save_flash",             "Saves current runtime config to flash memory.",                                    NULL, save_flash_cmd,        NULL, NULL, NULL}, NULL },
+    };
+    // clang-format on
 
+    *cmd_count = sizeof(cmd) / sizeof(cmd[0]);
+    *cmd_list = cmd;
+    return ESP_OK;
+}
 
-};
+static bool starts_with(const char *text, const char *prefix) {
+    return text != NULL && prefix != NULL && strncmp(text, prefix, strlen(prefix)) == 0;
+}
 
-int help_cmd(int argc, char **argv) {
-    ESP_LOGI(TAG, "Available commands:");
-    for (int i = 0; i < sizeof(cmd) / sizeof(cmd[0]); i++) {
-        ESP_LOGI(TAG, "%-16s - %s", cmd[i].command, cmd[i].help);
+static bool is_ads_command(const console_cmd_ex_t *cmd) {
+    return cmd != NULL && starts_with(cmd->cmd.command, "ads_");
+}
+
+static bool is_sd_command(const console_cmd_ex_t *cmd) {
+    return cmd != NULL && starts_with(cmd->cmd.command, "sd_");
+}
+
+static bool is_system_command(const console_cmd_ex_t *cmd) {
+    return cmd != NULL && !is_ads_command(cmd) && !is_sd_command(cmd);
+}
+
+static void print_command_section(const char *title,
+                                  bool (*predicate)(const console_cmd_ex_t *),
+                                  const console_cmd_ex_t *cmds,
+                                  size_t cmd_count) {
+    bool printed_any = false;
+
+    printf("========== %s ==========\n", title);
+
+    for (size_t i = 0; i < cmd_count; i++) {
+        if (predicate(&cmds[i])) {
+            printf("%-20s - %s\n", cmds[i].cmd.command, cmds[i].cmd.help);
+            printed_any = true;
+        }
     }
-    return 0;
+
+    if (!printed_any) {
+        printf("(no commands)\n");
+    }
+
+    printf("\n");
 }
 
 
+int help_cmd(int argc, char **argv) {
+    (void)argv;
+
+    if (g_cmd_list == NULL) {
+        ESP_LOGE(TAG, "Commands not initialized");
+        return 0;
+    }
+
+    if (argc == 1) {
+        ESP_LOGI(TAG, "Available commands:");
+        print_command_section("System", is_system_command, g_cmd_list, g_cmd_count);
+        print_command_section("ADS", is_ads_command, g_cmd_list, g_cmd_count);
+        print_command_section("SD", is_sd_command, g_cmd_list, g_cmd_count);
+        return 0;
+    }
+
+    if (argc == 2) {
+        for (size_t i = 0; i < (size_t)g_cmd_count; i++) {
+            if (strcmp(g_cmd_list[i].cmd.command, argv[1]) == 0) {
+                printf("%s\n", g_cmd_list[i].cmd.command);
+                printf("  %s\n", g_cmd_list[i].cmd.help);
+                return 0;
+            }
+        }
+
+        ESP_LOGE(TAG, "Unknown command: %s", argv[1]);
+        return 0;
+    }
+
+    ESP_LOGE(TAG, "Usage: help [command]");
+    return 0;
+}
+
 esp_err_t console_config_init() {
-    esp_err_t ret;
-    ret = console_init();
-    ret = console_register_commands(cmd, sizeof(cmd) / sizeof(cmd[0]));
+    esp_err_t ret = console_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "%s", esp_err_to_name(ret));
         return ret;
     }
-    return ret;
+
+    ret = setup_commands(&g_cmd_count, &g_cmd_list);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to setup commands");
+        return ret;
+    }
+
+    ret = console_register_commands(g_cmd_list, g_cmd_count);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "%s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    return ESP_OK;
 }
