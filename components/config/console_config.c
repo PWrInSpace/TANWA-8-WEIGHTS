@@ -686,32 +686,31 @@ int help_cmd(int argc, char **argv);
 
 static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
     // clang-format off
-    // Format: { {"command", "help", hint, func, argtable, func_w_context} }
-    // arg_completion = NULL 
+    // Format: { {"command", "help", hint, func, argtable, func_w_context, context}, arg_completion }
     static console_cmd_ex_t cmd[] = {
-        { {"reset",                  "Reset the device",                                                                  NULL, reset_device,          NULL, NULL} },
-        { {"ads_readc",              "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task,            NULL, NULL} },
-        { {"sd_read_file",           "Print file on std out from sd. Usage: sd_read_file [file_path]",                   NULL, read_sd_file,          NULL, NULL} },
-        { {"sd_clear_file",          "Empty a file on the SD card. Usage: sd_clear_file [file_path]",                    NULL, empty_sd_file,         NULL, NULL} },
-        { {"ads_samples",            "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]",        NULL, ads1256_get_sampes,    NULL, NULL} },
-        { {"ads_change_mux",         "Change ads channel. Usage: ads_change_mux [dev_num] [0-3]",                        NULL, change_mux_channel,    NULL, NULL} },
-        { {"ads_read_cal",           "Read calibration registers. Usage: ads_read_cal",                                  NULL, read_cal_registers,    NULL, NULL} },
-        { {"ads_calibrate",          "Calibrate device on current channel. Usage: ads_calibrate [dev_num]",              NULL, calibrate_device,      NULL, NULL} },
-        { {"ads_reset",              "Reset ads device. Usage: ads_reset [dev_num]",                                     NULL, ads1256_reset_cli,     NULL, NULL} },
-        { {"ads_set_sps",            "Set data rate for ads device. Usage: ads_set_sps [dev_num] [sps_value]",           NULL, ads1256_set_sps_cmd,   NULL, NULL} },
-        { {"ads_read_mux_samples",   "Read samples from the ADS1256 MUX. Usage: ads_read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples,      NULL, NULL} },
-        { {"ads_dev_info",           "Display device configuration information. Usage: ads_dev_info [dev_num]",          NULL, dev_info,              NULL, NULL} },
-        { {"ads_print_data",         "Print data from ADS1256 device. Usage: ads_print_data [dev_num]",                  NULL, print_data,            NULL, NULL} },
-        { {"help",                   "Display this help message",                                                        NULL, help_cmd,              NULL, NULL} },
-        { {"ads_suspend_task",       "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]",                          NULL, suspend_task,          NULL, NULL} },
-        { {"ads_resume_task",        "Resume ADS1256 task. Usage: ads_resume_task [dev_num]",                            NULL, resume_task,           NULL, NULL} },
-        { {"ads_delete_task",        "Delete ADS1256 task. Usage: ads_delete_task [dev_num]",                            NULL, dlete_task,            NULL, NULL} },
-        { {"ads_read_id",            "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]",                        NULL, read_id,               NULL, NULL} },
-        { {"ads_tare",               "Zero all sensors. Usage: ads_tare",                                                NULL, tare_cmd,              NULL, NULL} },
-        { {"ads_calibrate_channel",  "Calibrate one channel. Usage: ads_calibrate_channel <channel> <weight>",           NULL, calibrate_cmd,         NULL, NULL} },
-        { {"read_flash",             "Reads and displays saved data in flash memory.",                                   NULL, read_flash_cmd,        NULL, NULL} },
-        { {"display_config",         "Displays current runtime config (RAM).",                                           NULL, display_config_cmd,    NULL, NULL} },
-        { {"save_flash",             "Saves current runtime config to flash memory.",                                    NULL, save_flash_cmd,        NULL, NULL} },
+        { {"reset",                  "Reset the device",                                                                  NULL, reset_device,          NULL, NULL, NULL}, NULL },
+        { {"ads_readc",              "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task,            NULL, NULL, NULL}, NULL },
+        { {"sd_read_file",           "Print file on std out from sd. Usage: sd_read_file [file_path]",                   NULL, read_sd_file,          NULL, NULL, NULL}, NULL },
+        { {"sd_clear_file",          "Empty a file on the SD card. Usage: sd_clear_file [file_path]",                    NULL, empty_sd_file,         NULL, NULL, NULL}, NULL },
+        { {"ads_samples",            "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]",        NULL, ads1256_get_sampes,    NULL, NULL, NULL}, NULL },
+        { {"ads_change_mux",         "Change ads channel. Usage: ads_change_mux [dev_num] [0-3]",                        NULL, change_mux_channel,    NULL, NULL, NULL}, NULL },
+        { {"ads_read_cal",           "Read calibration registers. Usage: ads_read_cal",                                  NULL, read_cal_registers,    NULL, NULL, NULL}, NULL },
+        { {"ads_calibrate",          "Calibrate device on current channel. Usage: ads_calibrate [dev_num]",              NULL, calibrate_device,      NULL, NULL, NULL}, NULL },
+        { {"ads_reset",              "Reset ads device. Usage: ads_reset [dev_num]",                                     NULL, ads1256_reset_cli,     NULL, NULL, NULL}, NULL },
+        { {"ads_set_sps",            "Set data rate for ads device. Usage: ads_set_sps [dev_num] [sps_value]",           NULL, ads1256_set_sps_cmd,   NULL, NULL, NULL}, NULL },
+        { {"ads_read_mux_samples",   "Read samples from the ADS1256 MUX. Usage: ads_read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples,      NULL, NULL, NULL}, NULL },
+        { {"ads_dev_info",           "Display device configuration information. Usage: ads_dev_info [dev_num]",          NULL, dev_info,              NULL, NULL, NULL}, NULL },
+        { {"ads_print_data",         "Print data from ADS1256 device. Usage: ads_print_data [dev_num]",                  NULL, print_data,            NULL, NULL, NULL}, NULL },
+        { {"help",                   "Display this help message",                                                        NULL, help_cmd,              NULL, NULL, NULL}, NULL },
+        { {"ads_suspend_task",       "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]",                          NULL, suspend_task,          NULL, NULL, NULL}, NULL },
+        { {"ads_resume_task",        "Resume ADS1256 task. Usage: ads_resume_task [dev_num]",                            NULL, resume_task,           NULL, NULL, NULL}, NULL },
+        { {"ads_delete_task",        "Delete ADS1256 task. Usage: ads_delete_task [dev_num]",                            NULL, dlete_task,            NULL, NULL, NULL}, NULL },
+        { {"ads_read_id",            "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]",                        NULL, read_id,               NULL, NULL, NULL}, NULL },
+        { {"ads_tare",               "Zero all sensors. Usage: ads_tare",                                                NULL, tare_cmd,              NULL, NULL, NULL}, NULL },
+        { {"ads_calibrate_channel",  "Calibrate one channel. Usage: ads_calibrate_channel <channel> <weight>",           NULL, calibrate_cmd,         NULL, NULL, NULL}, NULL },
+        { {"read_flash",             "Reads and displays saved data in flash memory.",                                   NULL, read_flash_cmd,        NULL, NULL, NULL}, NULL },
+        { {"display_config",         "Displays current runtime config (RAM).",                                           NULL, display_config_cmd,    NULL, NULL, NULL}, NULL },
+        { {"save_flash",             "Saves current runtime config to flash memory.",                                    NULL, save_flash_cmd,        NULL, NULL, NULL}, NULL },
     };
     // clang-format on
 
