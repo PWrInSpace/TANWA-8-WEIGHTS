@@ -1,6 +1,6 @@
 # TANWA SLAVE TEMPLATE
 
-TANWA - filling, weighting, pressurizing and igniting system slave node template:
+TANWA WEIGHTS slave node template:
 
 ## POINTS TO CHANGE:
 
@@ -22,33 +22,46 @@ TANWA - filling, weighting, pressurizing and igniting system slave node template
 
 
 ## TECHNOLOGIES AND TOOLS USED:
-The project was developed in C as embedded systems firmware dedicated to the ESP32 microcontroller family (e.g., ESP32-S3). The architecture emphasizes Hardware Abstraction Layer (HAL) isolation and advanced pre-flight signal bus diagnostics.
+This project is a firmware written in C for ESP32 microcontrollers (like the ESP32-S3). It is designed to be easily adaptable to different hardware and includes advanced tests to check system health before operation.
 
 **Core technologies:**
-* Programming Language: C (C99 / C11 standards) – focused on high performance and low-level memory management.
-* Framework / SDK: ESP-IDF (Espressif IoT Development Framework) – the official, native runtime environment, providing maximum control over the microcontroller with zero system overhead.
-* FreeRTOS (Real-Time Operating System): The real-time multitasking kernel embedded within ESP-IDF. It ensures deterministic execution, task scheduling, prioritization of critical I/O operations (telemetry logging), and safe thread blocking using underlying RTOS delays (usleep).
+
+*C Programming Language:* Used for high performance and direct control over the system's memory.
+
+*ESP-IDF Framework:* The official development tool for ESP32 chips, allowing full control over the hardware without slowing it down.
+
+*FreeRTOS:* A real-time operating system that manages multiple tasks at once, ensuring important jobs (like saving flight data) always run smoothly and on time.
 
 **Peripherals & Storage:**
-* SDMMC Bus (4-bit Mode): Utilizes the native hardware controller (driver/sdmmc_host.h, sdmmc_cmd.h) for high-speed, parallel logging of dense telemetry data streams.
-* Virtual File System (VFS FAT): Integrates the SD card with a FAT file system (esp_vfs_fat.h), enabling standard C library file operations on .txt files.
-* ADC Oneshot Driver (esp_adc/adc_oneshot.h): Leverages the Analog-to-Digital Converter for precise voltage measurements on data lines for diagnostic purposes.
-* Software ADC Calibration: Implements Curve Fitting and Line Fitting calibration schemes using factory-burned calibration data stored in the chip's eFuse memory.
-* GPIO Driver: Advanced I/O line control, including open-drain mode configuration (GPIO_MODE_INPUT_OUTPUT_OD) and dynamic management of internal pull-up resistors.
 
-**Low-Level Diagnostics & Signal Integrity:**
-* CPU Cycle Profiling (esp_cpu.h): Uses processor registers and esp_cpu_get_cycle_count() to profile electrical parameters with single-clock-cycle precision.
-* Signal Integrity Testing: Features custom routines to verify signal rise times (PIN recovery time) and detect short circuits or parasitic crosstalk (cross-talk) between PCB traces.
-* Hardware Abstraction Layer (HAL): Implements a function-pointer-based driver architecture (e.g., for the LED driver), allowing easy hardware swapping and seamless unit testing/mocking.
+*High-Speed SD Card Connection:* Uses the chip's built-in hardware to quickly save large amounts of system data.
 
-**Standards & Auxiliary Mechanisms:**
-* Standard C Library & POSIX: Relies on standard, safe I/O and time operations (stdio.h, sys/stat.h, unistd.h).
-* Logging Component (ESP_LOG): Provides structured system event logging categorized by tags and verbosity levels (Error, Warning, Info, Debug) to facilitate post-flight analysis.
+*File System (FAT):* Allows the system to read and write standard .txt files directly to the SD card.
+
+*Voltage Measurement (ADC):* Accurately reads electrical signals on the data lines for system testing.
+
+*Sensor Calibration:* Uses factory settings saved inside the chip to make sure all voltage readings are highly accurate.
+
+*Advanced Pin Control (GPIO):* Manages the physical connection pins on the chip, controlling how electrical signals and internal resistors behave.
+
+**Diagnostics & System Health:**
+
+*Precise Timing:* Uses the processor's internal clock to measure electrical signals with extreme, single-cycle accuracy.
+
+*Circuit Health Checks:* Custom tests that check for short circuits, signal interference, and overall wire health on the circuit board.
+
+*Flexible Hardware Design (HAL):* Keeps the main code separate from specific hardware, making it easy to swap out physical parts (like LEDs) and test the system.
+
+**Standards & Extra Features:**
+
+*Standard C Libraries:* Uses standard, reliable methods for handling time and data.
+
+*System Logging:* Records system events and categorizes them (Errors, Warnings, Info, Debug) to make it easier to analyze performance and fix issues later.
 
 ## USAGE AND CHARACTERISTICS:
 * Saving data onto an SD card
-* Communicating with other PCBs through CAN and USB
-* Filling, weighting, pressurizing and igniting the system
+* Communicating with TANWA-COM through CAN and USB
+* Weighting the system
 * Component initialization and diagnostics
 
 
