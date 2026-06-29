@@ -178,7 +178,7 @@ void save_weight_task(void *arg)
         if(ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &data))
         {       
             timer_current = esp_timer_get_time();     
-            save_weight_as_text(file_path, data.weight, 4, (uint32_t)((timer_current - timer_start)/1000));
+            save_weight_as_text(file_path, data.weight, (sizeof(data_weight) / sizeof(data_weight[0])), (uint32_t)((timer_current - timer_start)/1000));
         } 
     vTaskDelay(pdMS_TO_TICKS(1000));    
 
