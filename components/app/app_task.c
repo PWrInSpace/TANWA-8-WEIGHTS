@@ -38,7 +38,7 @@ esp_err_t app_task_deinit(void) {
 }
 
     
-void start_readc_task(ads1256_device_t dev ,uint8_t time) {
+void start_readc_task(ads1256_device_t dev, uint8_t time) {
 
 
     ads1256_start_readc(dev);

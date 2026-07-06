@@ -2,7 +2,6 @@
 #include <string.h>
 #include <esp_log.h>
 #include "system_timer.h"
-#include "esp_log.h"
 
 #define TAG "TIMER"
 

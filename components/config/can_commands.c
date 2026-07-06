@@ -9,7 +9,7 @@
 // ##### local variables #####
 static const char *TAG = "CAN_COMMANDS";
 static bool only_readc_task = false;
-// ##### local vatriables #####
+// ##### local variables #####
 
 
 // ##### help functions #####
@@ -303,15 +303,15 @@ esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length)
     uint8_t resp1[6];
     uint8_t resp2[6];
     uint8_t resp3[6];
-    memcpy(resp0, &weight2, sizeof(weight0));
+    memcpy(resp0, &weight0, sizeof(weight0));
     resp0[4] = 1;
     resp0[5] = 0;
     esp_err_t err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp0, sizeof(resp0));
-    memcpy(resp1, &weight2, sizeof(weight0));
+    memcpy(resp1, &weight1, sizeof(weight0));
     resp1[4] = 1;
     resp1[5] = 1;
     err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp1, sizeof(resp1));
-    memcpy(resp2, &weight3, sizeof(weight0));
+    memcpy(resp2, &weight2, sizeof(weight0));
     resp2[4] = 1;
     resp2[5] = 2;
     err = can_send_message(CAN_SEND_ADS_CH_WEIGHT, resp2, sizeof(resp2));
@@ -336,8 +336,12 @@ esp_err_t can_get_weights(uint8_t *data, uint8_t length)
     ads1256_data_t ads_data_r;  
     ads1256_data_t ads_data_n2o;
 
-    if(!ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &ads_data_r) || !ads1256_get_data_struct_copy(ADS1256_DEVICE_2, &ads_data_n2o)) {
+    if(!ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &ads_data_r)) {
         ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_1");
+        return ESP_FAIL;
+    }
+    if(!ads1256_get_data_struct_copy(ADS1256_DEVICE_2, &ads_data_n2o)) {
+        ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_2");
         return ESP_FAIL;
     }
 
