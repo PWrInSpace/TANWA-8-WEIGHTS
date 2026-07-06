@@ -191,7 +191,6 @@ void ads1256_start_readc(ads1256_device_t device)
         vTaskDelay(pdMS_TO_TICKS(50)); // Wait for any ongoing read_mux task to finish
     }
 
-    ads1256_hamownia_drut();
     
     ads1256_start_continuous_read(device);
     vTaskDelay(pdMS_TO_TICKS(1));
@@ -219,24 +218,36 @@ void ads1256_data_from_channels(void*  pvParameters)
     ads1256_data_t data = {{0.0f, 0.0f, 0.0f, 0.0f}};
     ads1256_data_t sample_batch[ADS1256_UPDATE_DATA_AVG_SAMPLES];
     read_mux_stop_flag = false;
-    uint8_t iterator = 0;
+    uint8_t cur = 0;
     uint8_t batch_index = 0;
+
+    ads1256_change_channel(device, 0);
+    ads1256_sync(device);
+    ads1256_wake_up(device);
 
     while (!read_mux_stop_flag)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        ads1256_change_channel_and_read(device, iterator, &data.weight[iterator]);
-        iterator++;
 
-        if(iterator >= 4)
-        {
-            iterator = 0;
+        uint8_t raw_data[3] = {0, 0, 0};
+        if (!ads1256_get_raw_data(device, raw_data) ||
+            !ads1256_raw_data_to_value(device, raw_data, &data.weight[cur], cur)) {
+            ESP_LOGE("ADS1256", "Failed to read channel %d on device %d",
+                     cur, ads1256_device_to_number(device));
+        }
+
+        cur = (cur + 1) % 4;
+        if (cur == 0) {
             sample_batch[batch_index++] = data;
             if (batch_index >= ADS1256_UPDATE_DATA_AVG_SAMPLES) {
                 ads1256_update_data_struct(device, sample_batch, ADS1256_UPDATE_DATA_AVG_SAMPLES);
                 batch_index = 0;
             }
         }
+
+        ads1256_change_channel(device, cur);
+        ads1256_sync(device);
+        ads1256_wake_up(device);
     }
 
     *task_handle = NULL;
