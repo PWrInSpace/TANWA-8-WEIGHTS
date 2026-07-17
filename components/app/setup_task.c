@@ -9,7 +9,7 @@
 #include "app_task.h"
 #include "mcu_spi_config.h"
 #include "mcu_gpio_config.h"
-#include "ads1256.h"
+#include "ads1256_wrapper.h"
 #include "sd_task.h"
 #include "ads1256_task.h"
 #include "timers_config.h"

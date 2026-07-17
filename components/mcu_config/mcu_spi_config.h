@@ -88,5 +88,5 @@ typedef struct ads1256_spi_transmit_t
  */
 bool _ads1256_spi_transmit(ads1256_spi_transmit_t* ads_transmit, uint8_t* rx_data, size_t rx_len);
 
-bool _ads1256_spi_transmit_queued(const uint8_t* tx_data, size_t tx_len, uint8_t* rx_data, size_t rx_len);
+bool _ads1256_spi_transmit_queued(uint8_t cs_pin, const uint8_t* tx_data, size_t tx_len, uint8_t* rx_data, size_t rx_len);
 #endif /* PWRINSPACE_MCU_SPI_CONFIG_H_ */

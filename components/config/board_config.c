@@ -25,7 +25,7 @@
 #include "console_config.h"
 
 #include "mcu_spi_config.h"
-#include "ads1256.h"
+#include "ads1256_wrapper.h"
 #include "sd_task.h"
 #include "ads1256_task.h"
 #include "timers_config.h"
@@ -49,6 +49,12 @@ board_config_t config = {
     },
 };
 
+static ads1256_wrapper_t* ads1 = NULL;
+
+ads1256_wrapper_t* board_get_ads1256(int id) {
+    return id == 1 ? ads1 : NULL;
+}
+
 esp_err_t board_config_init(void) {
 
     esp_err_t err;
@@ -71,22 +77,35 @@ esp_err_t board_config_init(void) {
         return ESP_FAIL;
     }
 
-
-
-    if(!timers_init()) {
-        ESP_LOGE(TAG, "Failed to initialize timers");
-        return ESP_FAIL;
-    }
-    
-    err = flash_init(); //moved it higher to avoid ads1256_task_init reading hard coded data
-
+    err = flash_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Flash/NVS initialization failed");
         return err;
     }
 
-    if(!ads1256_task_init()) {
+    ads1256_pin_config_t ads1_pins = {
+        .cs_gpio   = 15,
+        .drdy_gpio = 18,
+        .reset_gpio = 17,
+        .pwdn_gpio  = 16,
+    };
+    ads1 = ads1256_init(&ads1_pins);
+    if (ads1 == NULL) {
+        ESP_LOGE(TAG, "Failed to initialize ADS1256 device 1");
+        return ESP_FAIL;
+    }
+
+    if (!timers_init()) {
+        ESP_LOGE(TAG, "Failed to initialize timers");
+        ads1256_deinit(ads1);
+        ads1 = NULL;
+        return ESP_FAIL;
+    }
+
+    if(!ads1256_task_init(ads1)) {
         ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
+        ads1256_deinit(ads1);
+        ads1 = NULL;
         return ESP_FAIL;
     }
 

@@ -20,8 +20,6 @@ typedef enum {
     CAN_SEND_BOARD_DATA	            =   0x3F11,
     CAN_SEND_ADS1_ALL_CH_WEIGHT1    =	0x3F12,
     CAN_SEND_ADS1_ALL_CH_WEIGHT2    =	0x3F13,
-    CAN_SEND_ADS2_ALL_CH_WEIGHT1    =	0x3F14,
-    CAN_SEND_ADS2_ALL_CH_WEIGHT2    =	0x3F15,
     CAN_SEND_ADS_CH_WEIGHT	        =   0x0F20,
     CAN_SEND_WEIGHTS	            =   0x3F30
 
@@ -48,7 +46,7 @@ esp_err_t can_get_board_data(uint8_t *data, uint8_t length);
 * COM -> WEIGHT_BOARD 
 * 
 * Data length = 3 bytes
-* data [0] = dev_num (1 or 2) | data [1..2] = Time_s
+* data [0] = device ID (only 1 is supported) | data [1..2] = Time_s
 *
 */
 esp_err_t can_start_measure(uint8_t *data, uint8_t length);
@@ -57,7 +55,7 @@ esp_err_t can_start_measure(uint8_t *data, uint8_t length);
 * COM -> WEIGHT_BOARD 
 * 
 * Data length = 1 byte
-* data [0] = dev_num (1 or 2)
+* data [0] = device ID (only 1 is supported)
 *
 */
 esp_err_t can_ads_tare(uint8_t *data, uint8_t length);
@@ -67,7 +65,7 @@ esp_err_t can_ads_tare(uint8_t *data, uint8_t length);
 * COM -> WEIGHT_BOARD
 *
 * Data length = 2 bytes
-* data [0] = dev_num (1 or 2) | data [1] = channel_num (0-3)
+* data [0] = device ID (only 1 is supported) | data [1] = channel_num (0-3)
 */
 esp_err_t can_set_ads_ch(uint8_t *data, uint8_t length);
 
@@ -75,14 +73,14 @@ esp_err_t can_set_ads_ch(uint8_t *data, uint8_t length);
 * COM -> WEIGHT_BOARD
 *
 * Data length = 6 bytes
-* data [0] = dev_num (1 or 2) | data[1] = channel_num (0-3) | data [2..5] = offset (int32_t)
+* data [0] = device ID (only 1 is supported) | data[1] = channel_num (0-3) | data [2..5] = offset (int32_t)
 */
 esp_err_t can_set_ads_offset(uint8_t *data, uint8_t length);
 
 /*
 * COM -> WEIGHT_BOARD
 * Data length = 1 byte
-* data [0] = dev_num (1 or 2)
+* data [0] = device ID (only 1 is supported)
 *
 * 1'st WEIGHT_BOARD -> COM
 * Data length = 8 bytes
@@ -95,13 +93,11 @@ esp_err_t can_set_ads_offset(uint8_t *data, uint8_t length);
 esp_err_t can_get_ads_ch_all_weight(uint8_t *data, uint8_t length);
 
 /*
-* COM -> WEIGHT_BOARD
-* Data length = 2 bytes
-* data [0] = dev_num (1 or 2) | data [1] = channel_num (0-3)
-*
+ * Sends all four channels from board device ID 1.
+ *
 * WEIGHT_BOARD -> COM
-* Data length = 4 bytes 
-* data [0..3] = weight (float)
+ * Data length = 6 bytes
+ * data [0..3] = weight (float) | data [4] = device ID | data [5] = channel
 */
 esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length);
 

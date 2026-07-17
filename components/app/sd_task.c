@@ -3,8 +3,10 @@
 #include "esp_log.h"
 #include "mcu_spi_config.h" //mutex_spi
 #include "ads1256_task.h"
+#include "board_config.h"
 #include "driver/sdmmc_host.h"
 #include <dirent.h>
+#include "esp_timer.h"
 
 #define TAG "SD_TASK"
 static sd_card_t sd_card;
@@ -172,13 +174,14 @@ void save_weight_task(void *arg)
 
      save_header_as_text(file_path, "Weight Data\n");
     int64_t timer_start = esp_timer_get_time();
+    int64_t timer_current;
      while (1)
      {
         ads1256_data_t data;
-        if(ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &data))
+          if(ads1256_get_data_struct_copy(board_get_ads1256(1), &data))
         {       
             timer_current = esp_timer_get_time();     
-            save_weight_as_text(file_path, data.weight, (sizeof(data_weight) / sizeof(data_weight[0])), (uint32_t)((timer_current - timer_start)/1000));
+            save_weight_as_text(file_path, data.weight, (sizeof(data.weight) / sizeof(data.weight[0])), (uint32_t)((timer_current - timer_start)/1000));
         } 
     vTaskDelay(pdMS_TO_TICKS(1000));    
 

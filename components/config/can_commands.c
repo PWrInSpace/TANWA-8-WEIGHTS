@@ -1,8 +1,9 @@
 #include "can_commands.h"
 
 #include "esp_log.h"
-#include "ads1256.h"
+#include "ads1256_wrapper.h"
 #include "app_task.h"
+#include "board_config.h"
 #include <string.h>
 #include "can_api.h"
 
@@ -16,18 +17,6 @@ static bool only_readc_task = false;
 bool valid_data_length(uint8_t length, uint8_t expected_length) {
     if (length != expected_length) {
         ESP_LOGE(TAG, "Invalid data length: expected %d, got %d", expected_length, length);
-        return false;
-    }
-    return true;
-}
-
-bool valid_and_set_device(uint8_t device_num, ads1256_device_t *device) {
-    if (device_num == 1) {
-        *device = ADS1256_DEVICE_1;
-    } else if (device_num == 2) {
-        *device = ADS1256_DEVICE_2;
-    } else {
-        // ESP_LOGE(TAG, "Invalid device number: %d", device_num);
         return false;
     }
     return true;
@@ -92,11 +81,10 @@ esp_err_t can_start_measure(uint8_t *data, uint8_t length)
 {
     /*
     * data length = 3 bytes
-    * data[0] = dev_num (1 or 2)
+    * data[0] = device ID (only 1 is supported)
     * data[1...2] = time (uint16_t, 1-600 seconds)
     */
 
-    ads1256_device_t ads_device;
     uint16_t time;
     only_readc_task = true;
 
@@ -104,7 +92,9 @@ esp_err_t can_start_measure(uint8_t *data, uint8_t length)
         return ESP_ERR_INVALID_ARG;
     }
 
-    if(!valid_and_set_device(data[0], &ads_device)) {
+    ads1256_wrapper_t* w = board_get_ads1256(data[0]);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", data[0]);
         return ESP_FAIL;
     }
 
@@ -113,28 +103,35 @@ esp_err_t can_start_measure(uint8_t *data, uint8_t length)
     // }
     memcpy(&time, &data[1], sizeof(uint16_t));
 
-    start_readc_task(ads_device, time);
-    return ESP_OK;
+if (!start_readc_task(w, time)) {
+    ESP_LOGE(TAG, "Failed to start measurement");
+    return ESP_FAIL;
+}
+
+return ESP_OK;
 }
 
 esp_err_t can_ads_tare(uint8_t *data, uint8_t length)
 {
     /*
     * data length = 1 byte
-    * data[0] = dev_num (1 or 2)
+    * data[0] = device ID (only 1 is supported)
     */
-
-    ads1256_device_t ads_device;
 
     if(!valid_data_length(length, 1)) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if(!valid_and_set_device(data[0], &ads_device)) {
+    ads1256_wrapper_t* w = board_get_ads1256(data[0]);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", data[0]);
         return ESP_FAIL;
     }
 
-    //odczytaj pomiar ze structa i ustaw nowy offset
+    if (!ads1256_tare_all(w)) {
+        ESP_LOGE(TAG, "Tare failed on device %d", data[0]);
+        return ESP_FAIL;
+    }
 
     return ESP_OK;
 }
@@ -143,18 +140,19 @@ esp_err_t can_set_ads_ch(uint8_t *data, uint8_t length)
 {
     /*
     * data length = 2 bytes
-    * data[0] = dev_num (1 or 2)
+    * data[0] = device ID (only 1 is supported)
     * data[1] = channel_num (0-3)
     */
 
-    ads1256_device_t ads_device;
     uint8_t channel_num;
 
     if(!valid_data_length(length, 2)) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if(!valid_and_set_device(data[0], &ads_device)) {
+    ads1256_wrapper_t* w = board_get_ads1256(data[0]);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", data[0]);
         return ESP_FAIL;
     }
 
@@ -162,8 +160,8 @@ esp_err_t can_set_ads_ch(uint8_t *data, uint8_t length)
         return ESP_FAIL;
     }
 
-    if(!ads1256_change_channel(ads_device, channel_num)) {
-        ESP_LOGE(TAG, "Failed to change channel on device %d", ads1256_device_to_number(ads_device));
+    if(!ads1256_change_channel(w, channel_num)) {
+        ESP_LOGE(TAG, "Failed to change channel on device %d", data[0]);
         return ESP_FAIL;
     }
 
@@ -174,12 +172,11 @@ esp_err_t can_set_ads_offset(uint8_t *data, uint8_t length)
 {
     /*
     * data length = 6 bytes
-    * data[0] = dev_num (1 or 2)
+    * data[0] = device ID (only 1 is supported)
     * data[1] = channel_num (0-3)
     * data[2..5] = offset (int32_t)
     */
 
-    ads1256_device_t ads_device;
     int32_t offset;
     uint8_t channel_num;
 
@@ -187,7 +184,9 @@ esp_err_t can_set_ads_offset(uint8_t *data, uint8_t length)
         return ESP_ERR_INVALID_ARG;
     }
 
-    if(!valid_and_set_device(data[0], &ads_device)) {
+    ads1256_wrapper_t* w = board_get_ads1256(data[0]);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", data[0]);
         return ESP_FAIL;
     }
 
@@ -197,8 +196,8 @@ esp_err_t can_set_ads_offset(uint8_t *data, uint8_t length)
 
     memcpy(&offset, &data[2], sizeof(offset));
 
-    if(!ads1256_set_zero_offset(ads_device, offset, channel_num)) {
-        ESP_LOGE(TAG, "Failed to set zero offset on device %d", ads1256_device_to_number(ads_device));
+    if(!ads1256_set_zero_offset(w, offset, channel_num)) {
+        ESP_LOGE(TAG, "Failed to set zero offset on device %d", data[0]);
         return ESP_FAIL;
     }
 
@@ -209,22 +208,22 @@ esp_err_t can_get_ads_ch_all_weight(uint8_t *data, uint8_t length)
 {
     /*
     * data length = 1 byte
-    * data[0] = dev_num (1 or 2)
+    * data[0] = device ID (only 1 is supported)
     */
-
-    ads1256_device_t ads_device;
 
     if(!valid_data_length(length, 1)) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if(!valid_and_set_device(data[0], &ads_device)) {
+    ads1256_wrapper_t* w = board_get_ads1256(data[0]);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", data[0]);
         return ESP_FAIL;
     }
 
     ads1256_data_t ads_data;
-    if(!ads1256_get_data_struct_copy(ads_device, &ads_data)) {
-        ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_1");
+    if(!ads1256_get_data_struct_copy(w, &ads_data)) {
+        ESP_LOGE(TAG, "Failed to get data");
         return ESP_FAIL;
     }
 
@@ -233,63 +232,31 @@ esp_err_t can_get_ads_ch_all_weight(uint8_t *data, uint8_t length)
     memcpy(&resp[4], &ads_data.weight[1], sizeof(float));
     memcpy(&resp[8], &ads_data.weight[2], sizeof(float));
     memcpy(&resp[12], &ads_data.weight[3], sizeof(float));
-    
-    if(ads_device == ADS1256_DEVICE_1) {
-        if(can_send_message(CAN_SEND_ADS1_ALL_CH_WEIGHT1, resp, sizeof(resp)/2) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to send CAN message for ADS1 channel 1 weight");
-            return ESP_FAIL;
-        }
-        if(can_send_message(CAN_SEND_ADS1_ALL_CH_WEIGHT2, &resp[8], sizeof(resp)/2) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to send CAN message for ADS1 channel 2 weight");
-            return ESP_FAIL;
-        }
-    } else if(ads_device == ADS1256_DEVICE_2) {
-        if(can_send_message(CAN_SEND_ADS2_ALL_CH_WEIGHT1, resp, sizeof(resp)/2) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to send CAN message for ADS2 channel 1 weight");
-            return ESP_FAIL;
-        }
-        if(can_send_message(CAN_SEND_ADS2_ALL_CH_WEIGHT2, &resp[8], sizeof(resp)/2) != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to send CAN message for ADS2 channel 2 weight");
-            return ESP_FAIL;
-        }
-    } else {
-        ESP_LOGE(TAG, "Invalid device number: %d", data[0]);
-        return ESP_ERR_INVALID_ARG;
+
+    if(can_send_message(CAN_SEND_ADS1_ALL_CH_WEIGHT1, resp, sizeof(resp)/2) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to send CAN message for ADS1 channel 1 weight");
+        return ESP_FAIL;
     }
-    
+    if(can_send_message(CAN_SEND_ADS1_ALL_CH_WEIGHT2, &resp[8], sizeof(resp)/2) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to send CAN message for ADS1 channel 2 weight");
+        return ESP_FAIL;
+    }
+
     return ESP_OK;
 }
 
 esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length)
 {
     /*
-    * data length = 2 bytes
-    * data[0] = dev_num (1 or 2)
-    * data[1] = channel_num (0-3)
+    * Sends all four channels from board device ID 1.
     */
 
-    // ads1256_device_t ads_device;
-    // uint8_t channel_num;
-
-    // ESP_LOGI(TAG, "can_get_ads_ch_weight called with data[0..7] =  %d %d %d %d %d %d %d %d", 
-            //  data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
-    // ESP_LOGI(TAG, "can_get_ads_ch_weight called");
-    // if(!valid_data_length(length, 0)) {
-    //     return ESP_ERR_INVALID_ARG;
-    // }
-
-    // if(!valid_and_set_device(data[0], &ads_device)) {
-    //     return ESP_FAIL;
-    // }
-
-    // if(!valid_and_set_channel(data[1], &channel_num)) {
-    //     return ESP_FAIL;
-    // }
-
+    (void)data;
+    (void)length;
 
     ads1256_data_t ads_data;
-    if(!ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &ads_data)) {
-        ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_1");
+    if(!ads1256_get_data_struct_copy(board_get_ads1256(1), &ads_data)) {
+        ESP_LOGE(TAG, "Failed to get data");
         return ESP_FAIL;
     }
 
@@ -325,35 +292,23 @@ esp_err_t can_get_ads_ch_weight(uint8_t *data, uint8_t length)
 
 esp_err_t can_get_weights(uint8_t *data, uint8_t length)
 {
-    if(!valid_data_length(length, 0)) {
+    if (!valid_data_length(length, 0)) {
         return ESP_ERR_INVALID_ARG;
     }
 
+    ads1256_data_t ads_data;
+    if (!ads1256_get_data_struct_copy(board_get_ads1256(1), &ads_data)) {
+        ESP_LOGE(TAG, "Failed to get ADS1 data");
+        return ESP_FAIL;
+    }
+
+    float rocket_weight = ads_data.weight[0] + ads_data.weight[1];
+    float n2o_weight = ads_data.weight[2] + ads_data.weight[3];
+
     uint8_t resp[8];
-    float r_weight = 0.0f;
-    float n2o_weight = 0.0f;
-
-    ads1256_data_t ads_data_r;  
-    ads1256_data_t ads_data_n2o;
-
-    if(!ads1256_get_data_struct_copy(ADS1256_DEVICE_1, &ads_data_r)) {
-        ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_1");
-        return ESP_FAIL;
-    }
-    if(!ads1256_get_data_struct_copy(ADS1256_DEVICE_2, &ads_data_n2o)) {
-        ESP_LOGE(TAG, "Failed to get data for ADS1256_DEVICE_2");
-        return ESP_FAIL;
-    }
-
-    for(int i = 0; i < 4; i++) {
-        r_weight += ads_data_r.weight[i];
-        n2o_weight += ads_data_n2o.weight[i];
-    }
-    
     memcpy(resp, &n2o_weight, sizeof(n2o_weight));
-    memcpy(&resp[4], &r_weight, sizeof(r_weight));
-    esp_err_t err = can_send_message(CAN_SEND_WEIGHTS, resp, sizeof(resp));
-    return err;
+    memcpy(&resp[4], &rocket_weight, sizeof(rocket_weight));
+    return can_send_message(CAN_SEND_WEIGHTS, resp, sizeof(resp));
 }
 
 // ##### command handlers #####

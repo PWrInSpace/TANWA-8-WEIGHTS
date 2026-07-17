@@ -6,10 +6,8 @@
 
 #include "board_config.h"
 #include "setup_task.h"
-#include "ads1256.h"
 #include "mcu_gpio_config.h"
 #include "sd_task.h"
-#include "ads1256_task.h"
 #include "app_task.h"
 #define TAG "APP"
 #include "mcu_twai_config.h"

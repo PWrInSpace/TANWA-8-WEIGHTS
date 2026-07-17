@@ -8,14 +8,15 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
-#define CS_GPIO_1 15 //TODO: zabrac z configu GPIO
-#define CS_GPIO_2 7 
-#define RESET_GPIO_1 17
-#define RESET_GPIO_2 36
-#define PWDN_GPIO_1 16
-#define PWDN_GPIO_2 37
-#define DRDY_GPIO_1 18
-#define DRDY_GPIO_2 35
+typedef struct {
+    int cs_gpio;
+    int drdy_gpio;
+    int reset_gpio;
+    int pwdn_gpio;
+} ads1256_pin_config_t;
+
+//Opaque driver handle
+typedef struct ads1256_t ads1256_t;
 
 #define STATUS_REGISTER_DEFAULT 0x00
 
@@ -94,74 +95,25 @@ typedef enum
     SPS_2P5 = DATA_RATE_REGISTER_2P5SPS
 } ads1256_sps_e;
 
-typedef enum ads1256_device_t
-{
-    ADS1256_DEVICE_1 = CS_GPIO_1,
-    ADS1256_DEVICE_2 = CS_GPIO_2
-} ads1256_device_t;
+int ads1256_sps_hex_to_value(ads1256_sps_e sps);
 
-extern TaskHandle_t DRDY1_task;
-extern TaskHandle_t DRDY2_task;
-
-
-typedef struct ads1256_channel_t
-{
-    ads1256_channel_e channel_hex; // hexadecimal channel number
-    int32_t zero_offset; // Zero offset for the channel
-    float factor; // Calibration factor for the channel    
-    uint8_t OFC_REG[3]; // Offset calibration registers
-    uint8_t FSC_REG[3]; // Full-scale calibration registers
-}ads1256_channel_t;
-
-typedef struct ads1256_config_t
-{
-    ads1256_device_t device; // Device identifier
-    ads1256_channel_t* channels; // Channels configuration
-    uint8_t active_channel;
-    ads1256_sps_e sps; // Samples per second setting
-} ads1256_config_t;    
-
-
-typedef struct ads1256_data_t
-{
-    float weight[4]; 
-} ads1256_data_t;
-
-/** Liczba pełnych przebiegów 4 kanałów uśrednianych w ads1256_update_data_struct. */
-#define ADS1256_UPDATE_DATA_AVG_SAMPLES 100
-
-extern SemaphoreHandle_t data_dev1_mutex;
-extern SemaphoreHandle_t data_dev2_mutex;
-
-extern ads1256_data_t ads1256_data_dev1;
-extern ads1256_data_t ads1256_data_dev2;
-
-int ads1256_device_to_number(ads1256_device_t device);
-
-bool ads1256_init(ads1256_device_t device);
-bool ads1256_pins_init(void);
-bool ads1256_single_transmit(ads1256_device_t device, const uint8_t* tx_data, size_t tx_length, uint8_t* rx_data, size_t rx_length);
-bool ads1256_get_raw_data(ads1256_device_t device, uint8_t* data);
-bool ads1256_read_id(ads1256_device_t device, uint8_t* id);
-bool ads1256_change_channel(ads1256_device_t device, uint8_t channel);
-bool ads1256_sync(ads1256_device_t device);
-bool ads1256_wake_up(ads1256_device_t device);
-bool ads1256_read_cal_registers(ads1256_device_t device);
-bool ads1256_self_cal(ads1256_device_t device);
-bool ads1256_reset(ads1256_device_t device);
-bool ads1256_set_sps(ads1256_device_t device, uint8_t sps_value);
-bool ads1256_set_calibration_registers(ads1256_device_t device, const uint8_t* OFC_REGISTER, const uint8_t* FSC_REGISTER);
-bool ads1256_change_channel_and_read(ads1256_device_t device, uint8_t channel, float* value);
-bool ads1256_raw_data_to_value(ads1256_device_t dev, uint8_t* data, float* value, uint8_t channel_num);
-bool ads1256_stop_continuous_read(ads1256_device_t device);
-bool ads1256_start_continuous_read(ads1256_device_t device);
-bool ads1256_get_data_struct_copy(ads1256_device_t device, ads1256_data_t* data);
-bool ads1256_hamownia_drut();
-bool ads1256_set_zero_offset(ads1256_device_t device, int32_t zero_offset, uint8_t channel_num);
-bool ads1256_tare_all(ads1256_device_t device);
-bool ads1256_calibrate_channel(ads1256_device_t device, uint8_t channel, float weight);
-
-void ads1256_get_config_info(ads1256_device_t device);
-void ads1256_update_data_struct(ads1256_device_t device, const ads1256_data_t* samples, size_t num_samples);
-void ads1256_print_data(ads1256_device_t device);
+bool ads1256_single_transmit(ads1256_t* ads,const uint8_t* tx_data, size_t tx_length,uint8_t* rx_data, size_t rx_length);
+bool ads1256_set_value(ads1256_t* ads, uint8_t register_address, uint8_t value);
+bool ads1256_read_register(ads1256_t* ads, uint8_t register_address, uint8_t* value);
+bool ads1256_reset(ads1256_t* ads);
+bool ads1256_wake_up(ads1256_t* ads);
+bool ads1256_sync(ads1256_t* ads);
+bool ads1256_self_cal(ads1256_t* ads);
+bool ads1256_sysocal(ads1256_t* ads);
+bool ads1256_sysgcal(ads1256_t* ads);
+bool ads1256_get_raw_data(ads1256_t* ads, uint8_t* data);
+bool ads1256_read_id(ads1256_t* ads, uint8_t* id);
+bool ads1256_read_cal_registers(ads1256_t* ads);
+bool ads1256_set_sps(ads1256_t* ads, uint8_t sps_register_value);
+bool ads1256_set_calibration_registers(ads1256_t* ads,const uint8_t ofc[3],const uint8_t fsc[3]);
+bool ads1256_start_continuous_read(ads1256_t* ads);
+bool ads1256_stop_continuous_read(ads1256_t* ads);
+const ads1256_pin_config_t* ads1256_get_pin_config(ads1256_t* ads);
+ads1256_t* ads1256_create(const ads1256_pin_config_t* pin_config);
+void ads1256_destroy(ads1256_t* ads);
 #endif

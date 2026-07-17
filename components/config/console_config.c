@@ -19,6 +19,7 @@
 #include "app_task.h"
 #include "sd_task.h"
 #include "ads1256_task.h"
+#include "board_config.h"
 #include <string.h>
 #include <stdlib.h>
 #include "flash.h"
@@ -32,7 +33,7 @@ static console_cmd_ex_t *g_cmd_list = NULL;
 
 char* add_sd_prefix(const char* path) {
     if (strncmp(path, "/sdcard/", 7) != 0) {
-        char* file_path = malloc(strlen(MOUNT_POINT) + strlen(path) + 2); // +2 for '/' and '\0'
+        char* file_path = malloc(strlen(MOUNT_POINT) + strlen(path) + 2);
         if (!file_path) {
             ESP_LOGE(TAG, "Failed to allocate memory for file_path");
             return NULL;
@@ -44,8 +45,6 @@ char* add_sd_prefix(const char* path) {
     }
 }
 
-/* HELP FUNCs*/
-
 int reset_device(int argc, char **argv) {
     ESP_LOGI(TAG, "Resetting device...");
     esp_restart();
@@ -53,12 +52,19 @@ int reset_device(int argc, char **argv) {
 }
 
 int tare_cmd(int argc, char **argv) {
-    if (argc != 1) {
-        ESP_LOGE(TAG, "Usage: tare");
+    if (argc != 2) {
+        ESP_LOGE(TAG, "Usage: tare [dev_num]");
         return 0;
     }
 
-    if (!ads1256_tare_all(ADS1256_DEVICE_1)) {
+    int device = atoi(argv[1]);
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", device);
+        return 0;
+    }
+
+    if (!ads1256_tare_all(w)) {
         ESP_LOGE(TAG, "Tare failed");
         return 0;
     }
@@ -68,32 +74,36 @@ int tare_cmd(int argc, char **argv) {
 }
 
 int calibrate_cmd(int argc, char **argv){
-    if(argc != 3) {
-        ESP_LOGE(TAG, "Usage: calibrate <channel> <weight>");
+    if(argc != 4) {
+        ESP_LOGE(TAG, "Usage: calibrate [dev_num] <channel> <weight>");
         return 0;
     }
 
-    int channel = atoi(argv[1]);
-    float weight = (float)atof(argv[2]);
+    int device = atoi(argv[1]);
+    int channel = atoi(argv[2]);
+    float weight = (float)atof(argv[3]);
 
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", device);
+        return 0;
+    }
     if (channel < 0 || channel > 3){
         ESP_LOGE(TAG, "Channel must be in range 0...3");
         return 0;
     }
-
     if (weight<=0.0f){
         ESP_LOGE(TAG,"Weight must be > 0 (use tare for zero weight)");
         return 0;
     }
 
-    if (!ads1256_calibrate_channel(ADS1256_DEVICE_1,(uint8_t)channel, weight)){
+    if (!ads1256_calibrate_channel(w,(uint8_t)channel, weight)){
         ESP_LOGE(TAG, "Calibration failed");
         return 0;
     }
 
     ESP_LOGI(TAG, "Calibration complete");
     return 0;
-
 }
 
 static void print_config(const data_config_t *cfg, const char *label) {
@@ -153,19 +163,11 @@ int read_mux_samples(int argc, char **argv) {
 
     int device = atoi(argv[1]);
     uint8_t time = atoi(argv[2]);
-    ads1256_device_t dev;
 
-    if(device == 1)
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
     if(time < 1)
@@ -174,10 +176,12 @@ int read_mux_samples(int argc, char **argv) {
         return -1;
     }
     ESP_LOGI(TAG, "Starting read mux samples task from cmd (forever xd) on device %d", device);
-    ads1256_start_channel_task(dev);
+    if (!ads1256_start_channel_task(w)) {
+        ESP_LOGE(TAG, "Failed to start channel task");
+        return -1;
+    }
 
     return 0;
-
 }
 
 int readc_task(int argc, char **argv) {
@@ -188,20 +192,11 @@ int readc_task(int argc, char **argv) {
     }
     int device = atoi(argv[1]);
     uint8_t time = atoi(argv[2]);
-    ads1256_device_t dev;
 
-    if(device == 1)
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
-
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
@@ -210,11 +205,14 @@ int readc_task(int argc, char **argv) {
         ESP_LOGE(TAG, "Time value must be greater than 0");
         return -1;
     }
-        // char *path = add_sd_prefix(argv[3]);
     ESP_LOGI(TAG, "Starting readc task from cmd");
 
-    start_readc_task(dev, time);
-    return 0;
+    if (!start_readc_task(w, time)) {
+        ESP_LOGE(TAG, "Failed to start readc task");
+        return 0;
+    }
+
+return 0;
 }
 
 int read_sd_file(int argc, char **argv) {
@@ -254,33 +252,22 @@ int change_mux_channel(int argc, char **argv)
         ESP_LOGE(TAG, "Usage: command [dev_num] [channel] ");
         return -1;
     }
-    int channel = atoi(argv[2]);
     int device_num = atoi(argv[1]);
+    int channel = atoi(argv[2]);
 
+    ads1256_wrapper_t* w = board_get_ads1256(device_num);
+    if (w == NULL)
+    {
+        ESP_LOGE(TAG, "Device %d not found", device_num);
+        return -1;
+    }
     if(channel < 0 || channel > 3)
     {
         ESP_LOGE(TAG, "Channel value must be between 0 and 3");
         return -1;
     }
 
-    ads1256_device_t dev;
-
-
-    if(device_num == 1)
-    {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device_num == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
-        return -1;
-    }
-
-    if(!ads1256_change_channel(dev, channel))
+    if(!ads1256_change_channel(w, channel))
     {
         ESP_LOGE(TAG, "Channel change error");
         return -1;
@@ -288,7 +275,6 @@ int change_mux_channel(int argc, char **argv)
 
     ESP_LOGI(TAG, "Channel changed!");
     return 0;
-
 }
 
 int ads1256_get_samples(int argc, char **argv)
@@ -299,62 +285,30 @@ int ads1256_get_samples(int argc, char **argv)
         return -1;
     }
 
-
     int device = atoi(argv[1]);
     int samples = atoi(argv[2]);
-    ads1256_device_t dev;
 
-    if(device == 1)
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
-
     if(samples < 1)
     {
         ESP_LOGE(TAG, "Number of samples have to be greater than 0");
         return -1;
     }
 
-    uint8_t data[3];
-    int32_t value;
-
-
     for(int i =0; i<samples; i++)
     {
-        // if(!ads1256_get_raw_data(dev, data))
-        // {
-        //     return -1;
-        // }
-        // value = (data[0] << 16) | (data[1] << 8) | data[2];
-
-        // if (value & 0x800000) {
-        //     value |= 0xFF000000;
-        // }
-
-        // ESP_LOGI(TAG, "Raw signed value: %d", value);
-        float weight = 0.0f;
         uint8_t raw_data[3];
-        ads1256_get_raw_data(ADS1256_DEVICE_1, raw_data);
+        ads1256_get_raw_data(ads1256_wrapper_get_hal(w), raw_data);
         int32_t raw_value = (raw_data[0] << 16) | (raw_data[1] << 8) | raw_data[2];
         if (raw_value & 0x800000) {
-            raw_value |= 0xFF000000; 
+            raw_value |= 0xFF000000;
         }
         ESP_LOGI(TAG, "Raw signed value: %d", raw_value);
-        // ads1256_raw_data_to_weight(&raw_data, ADS1256_DEVICE_1, &weight, 1);
-        // ESP_LOGI("CAN_COMMANDS", "Weight from device %d [N], channel %d: %f", ads_device, channel_num, weight);
-        // ESP_LOGI("CLI","waga w [n]: %f", weight );
-        // uint8_t resp[4];
-        // memcpy(resp, &weight, sizeof(weight));
-        // esp_err_t err = can_send_message(0x3F20, resp, sizeof(resp));
 
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -371,26 +325,18 @@ int read_id(int argc, char **argv)
     }
 
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
 
-    if(device == 1)
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
     uint8_t id;
     for(int i =0; i<50; i++)
     {
-        if(!ads1256_read_id(dev, &id))
+        if(!ads1256_read_id(ads1256_wrapper_get_hal(w), &id))
         {
             ESP_LOGE(TAG, "Failed to read ID from device %d", device);
             return -1;
@@ -411,23 +357,15 @@ int dev_info(int argc, char **argv)
     }
 
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
 
-    if(device == 1)
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
-    ads1256_get_config_info(dev);
+    ads1256_get_config_info(w);
     return 0;
 }
 
@@ -440,23 +378,15 @@ int read_cal_registers(int argc, char **argv)
     }
 
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
 
-    if(device == 1)
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
-    if(!ads1256_read_cal_registers(dev))
+    if(!ads1256_read_cal_registers(ads1256_wrapper_get_hal(w)))
     {
         ESP_LOGE(TAG, "Failed to read calibration registers");
         return -1;
@@ -474,28 +404,22 @@ int calibrate_device(int argc, char **argv)
         return -1;
     }
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
-    if(device == 1)
+
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
-    if(!ads1256_self_cal(dev))
+
+    if(!ads1256_self_cal(ads1256_wrapper_get_hal(w)))
     {
         ESP_LOGE(TAG, "Failed to perform self-calibration on device %d", device);
         return -1;
     }
     ESP_LOGI(TAG, "Self-calibration completed successfully for device %d", device);
 
-    if(!ads1256_read_cal_registers(dev))
+    if(!ads1256_read_cal_registers(ads1256_wrapper_get_hal(w)))
     {
         ESP_LOGE(TAG, "Failed to read calibration registers");
         return -1;
@@ -512,21 +436,15 @@ int ads1256_reset_cli(int argc, char **argv)
         return -1;
     }
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
-    if(device == 1)
+
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
-    if(!ads1256_reset(dev))
+
+    if(!ads1256_reset(ads1256_wrapper_get_hal(w)))
     {
         ESP_LOGE(TAG, "Failed to reset device %d", device);
         return -1;
@@ -544,20 +462,12 @@ int ads1256_set_sps_cmd(int argc, char **argv)
     }
     int device = atoi(argv[1]);
     int sps_value = atoi(argv[2]);
-    ads1256_device_t dev;
     uint8_t sps_register_value;
 
-    if(device == 1)
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL)
     {
-        dev = ADS1256_DEVICE_1;
-    }
-    else if(device == 2)
-    {
-        dev = ADS1256_DEVICE_2;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
@@ -576,12 +486,12 @@ int ads1256_set_sps_cmd(int argc, char **argv)
         case 7500: sps_register_value = DATA_RATE_REGISTER_7500SPS; break;
         case 15000: sps_register_value = DATA_RATE_REGISTER_15000SPS; break;
         case 30000: sps_register_value = DATA_RATE_REGISTER_30000SPS; break;
-        default: 
+        default:
             ESP_LOGE(TAG, "Invalid SPS value. Valid values are: 2.5 (205), 5, 10, 25, 50, 100, 500, 1000, 2000, 3750, 7500, 15000, 30000");
             return -1;
     }
 
-    if(!ads1256_set_sps(dev, sps_register_value))
+    if(!ads1256_set_sps(ads1256_wrapper_get_hal(w), sps_register_value))
     {
         ESP_LOGE(TAG, "Failed to set data rate on device %d", device);
         return -1;
@@ -597,18 +507,14 @@ int print_data(int argc, char **argv) {
     }
 
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
 
-    if(device == 1) {
-        dev = ADS1256_DEVICE_1;
-    } else if(device == 2) {
-        dev = ADS1256_DEVICE_2;
-    } else {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
-    ads1256_print_data(dev);
+    ads1256_print_data(w);
     return 0;
 }
 
@@ -619,18 +525,14 @@ int suspend_task(int argc, char **argv) {
     }
 
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
 
-    if(device == 1) {
-        dev = ADS1256_DEVICE_1;
-    } else if(device == 2) {
-        dev = ADS1256_DEVICE_2;
-    } else {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
-    ads1256_suspend_task(dev);
+    ads1256_suspend_task(w);
     return 0;
 }
 
@@ -641,18 +543,14 @@ int resume_task(int argc, char **argv) {
     }
 
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
 
-    if(device == 1) {
-        dev = ADS1256_DEVICE_1;
-    } else if(device == 2) {
-        dev = ADS1256_DEVICE_2;
-    } else {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
-    ads1256_resume_task(dev);
+    ads1256_resume_task(w);
     return 0;
 }
 
@@ -663,67 +561,26 @@ int delete_task(int argc, char **argv) {
     }
 
     int device = atoi(argv[1]);
-    ads1256_device_t dev;
 
-    if(device == 1) {
-        dev = ADS1256_DEVICE_1;
-    } else if(device == 2) {
-        dev = ADS1256_DEVICE_2;
-    } else {
-        ESP_LOGE(TAG, "Wrong dev_num. 1 - DEV1, 2-DEV2");
+    ads1256_wrapper_t* w = board_get_ads1256(device);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device %d not found", device);
         return -1;
     }
 
-    ads1256_delete_task(dev);
+    ads1256_delete_task(w);
     return 0;
 }
 
 int help_cmd(int argc, char **argv);
 
-
-
- // Place for the console configuration
-
-<<<<<<< readme_and_typos
- static esp_console_cmd_t cmd [] = {
- // example command:
- // cmd     help description   hint  function      args
- {"reset", "Reset the device", NULL, reset_device, NULL, NULL, NULL},
- {"ads_readc", "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task, NULL, NULL, NULL},
-{"sd_read_file", "Print file on std out from sd. Usage: sd_read_file [file_path]", NULL, read_sd_file, NULL, NULL, NULL},
-{"sd_clear_file", "Empty a file on the SD card. Usage: sd_clear_file [file_path]", NULL, empty_sd_file, NULL, NULL, NULL},
-{"ads_samples", "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]", NULL,ads1256_get_samples, NULL, NULL, NULL},
-{"ads_change_mux", "Change ads channel. Usage: ads_change_mux [dev_num] [0-3]", NULL, change_mux_channel, NULL, NULL, NULL},
-{"ads_read_cal", "Read calibration registers. Usage: ads_read_cal", NULL, read_cal_registers, NULL, NULL, NULL},
-{"ads_calibrate", "Calibrate device on current channel. Usage: ads_calibrate [dev_num]", NULL, calibrate_device, NULL, NULL, NULL},
-{"ads_reset", "Reset ads device. Usage: ads_reset [dev_num]", NULL, ads1256_reset_cli,NULL, NULL, NULL},
-{"ads_set_sps", "Set data rate for ads device. Usage: ads_set_sps [dev_num] [sps_value]", NULL, ads1256_set_sps_cmd, NULL, NULL, NULL},
-{"read_mux_samples", "Read samples from the ADS1256 MUX. Usage: read_mux_samples [dev_num] [nr_of_samples]", NULL, read_mux_samples, NULL, NULL, NULL},
-{"dev_info", "Display device configuration information. Usage: dev_info [dev_num]", NULL, dev_info, NULL, NULL, NULL},
-{"ads_print_data", "Print data from ADS1256 device. Usage: ads_print_data [dev_num]", NULL, print_data, NULL, NULL, NULL},
-{"help", "Display this help message", NULL, help_cmd, NULL, NULL, NULL},
-{"ads_suspend_task", "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]", NULL, suspend_task, NULL, NULL, NULL},
-{"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL, NULL, NULL},
-{"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, delete_task, NULL, NULL, NULL},
-{"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
-{"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
-{"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
-{"read_flash", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
-{"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL},
-{"save_flash", "Saves current runtime config to flash memory.", NULL, save_flash_cmd, NULL, NULL, NULL}
-
-
-};
-=======
 static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
-    // clang-format off
-    // Format: { {"command", "help", hint, func, argtable, func_w_context, context}, arg_completion }
     static console_cmd_ex_t cmd[] = {
         { {"reset",                  "Reset the device",                                                                  NULL, reset_device,          NULL, NULL, NULL}, NULL },
         { {"ads_readc",              "Run ads readc func for a [n] seconds. Usage: ads_readc [dev_num] [time_s] [file_path]", NULL, readc_task,            NULL, NULL, NULL}, NULL },
         { {"sd_read_file",           "Print file on std out from sd. Usage: sd_read_file [file_path]",                   NULL, read_sd_file,          NULL, NULL, NULL}, NULL },
         { {"sd_clear_file",          "Empty a file on the SD card. Usage: sd_clear_file [file_path]",                    NULL, empty_sd_file,         NULL, NULL, NULL}, NULL },
-        { {"ads_samples",            "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]",        NULL, ads1256_get_sampes,    NULL, NULL, NULL}, NULL },
+        { {"ads_samples",            "Returns measurements for n sec (1Hz). Usage: ads_samples [dev_num] [time]",        NULL, ads1256_get_samples,    NULL, NULL, NULL}, NULL },
         { {"ads_change_mux",         "Change ads channel. Usage: ads_change_mux [dev_num] [0-3]",                        NULL, change_mux_channel,    NULL, NULL, NULL}, NULL },
         { {"ads_read_cal",           "Read calibration registers. Usage: ads_read_cal",                                  NULL, read_cal_registers,    NULL, NULL, NULL}, NULL },
         { {"ads_calibrate",          "Calibrate device on current channel. Usage: ads_calibrate [dev_num]",              NULL, calibrate_device,      NULL, NULL, NULL}, NULL },
@@ -735,15 +592,14 @@ static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
         { {"help",                   "Display this help message",                                                        NULL, help_cmd,              NULL, NULL, NULL}, NULL },
         { {"ads_suspend_task",       "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]",                          NULL, suspend_task,          NULL, NULL, NULL}, NULL },
         { {"ads_resume_task",        "Resume ADS1256 task. Usage: ads_resume_task [dev_num]",                            NULL, resume_task,           NULL, NULL, NULL}, NULL },
-        { {"ads_delete_task",        "Delete ADS1256 task. Usage: ads_delete_task [dev_num]",                            NULL, dlete_task,            NULL, NULL, NULL}, NULL },
+        { {"ads_delete_task",        "Delete ADS1256 task. Usage: ads_delete_task [dev_num]",                            NULL, delete_task,            NULL, NULL, NULL}, NULL },
         { {"ads_read_id",            "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]",                        NULL, read_id,               NULL, NULL, NULL}, NULL },
-        { {"ads_tare",               "Zero all sensors. Usage: ads_tare",                                                NULL, tare_cmd,              NULL, NULL, NULL}, NULL },
-        { {"ads_calibrate_channel",  "Calibrate one channel. Usage: ads_calibrate_channel <channel> <weight>",           NULL, calibrate_cmd,         NULL, NULL, NULL}, NULL },
+        { {"ads_tare",               "Zero all sensors. Usage: ads_tare [dev_num]",                                      NULL, tare_cmd,              NULL, NULL, NULL}, NULL },
+        { {"ads_calibrate_channel",  "Calibrate one channel. Usage: ads_calibrate_channel [dev_num] <channel> <weight>", NULL, calibrate_cmd,         NULL, NULL, NULL}, NULL },
         { {"read_flash",             "Reads and displays saved data in flash memory.",                                   NULL, read_flash_cmd,        NULL, NULL, NULL}, NULL },
         { {"display_config",         "Displays current runtime config (RAM).",                                           NULL, display_config_cmd,    NULL, NULL, NULL}, NULL },
         { {"save_flash",             "Saves current runtime config to flash memory.",                                    NULL, save_flash_cmd,        NULL, NULL, NULL}, NULL },
     };
-    // clang-format on
 
     *cmd_count = sizeof(cmd) / sizeof(cmd[0]);
     *cmd_list = cmd;
@@ -787,8 +643,6 @@ static void print_command_section(const char *title,
 
     printf("\n");
 }
-
->>>>>>> layout
 
 int help_cmd(int argc, char **argv) {
     (void)argv;

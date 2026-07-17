@@ -3,7 +3,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
-#include "ads1256.h"
+#include "ads1256_wrapper.h"
 #include "mcu_spi_config.h"
 
 /* ustawic BUFFER_READC_SAMPLES tak aby byl wypelniany w max 3 sek*/
@@ -31,13 +31,12 @@ extern SemaphoreHandle_t readc_B_mutex;
 extern SemaphoreHandle_t buffer_A_ready;
 extern SemaphoreHandle_t buffer_B_ready;
 
+bool ads1256_task_init(ads1256_wrapper_t* w);
+bool ads1256_start_readc(ads1256_wrapper_t* w);
+bool ads1256_start_channel_task(ads1256_wrapper_t* w);
 
-bool ads1256_task_init(void);
-void ads1256_start_readc(ads1256_device_t device);
-void ads1256_start_channel_task(ads1256_device_t device);
-
-void ads1256_suspend_task(ads1256_device_t device);
-void ads1256_resume_task(ads1256_device_t device);
-void ads1256_delete_task(ads1256_device_t device);
+void ads1256_suspend_task(ads1256_wrapper_t* w);
+void ads1256_resume_task(ads1256_wrapper_t* w);
+void ads1256_delete_task(ads1256_wrapper_t* w);
 
 #endif

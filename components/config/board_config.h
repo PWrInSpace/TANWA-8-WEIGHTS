@@ -15,6 +15,7 @@
 
 #include "led_driver.h"
 #include "esp_err.h"
+#include "ads1256_wrapper.h"
 
 typedef struct {
     char board_name[32];
@@ -24,6 +25,7 @@ typedef struct {
 extern board_config_t config;
 
 esp_err_t board_config_init(void);
+ads1256_wrapper_t* board_get_ads1256(int id);
 
 #endif /* PWRINSPACE_BOARD_CONFIG_H */
 

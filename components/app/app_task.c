@@ -38,14 +38,23 @@ esp_err_t app_task_deinit(void) {
 }
 
     
-void start_readc_task(ads1256_device_t dev, uint8_t time) {
+bool start_readc_task(ads1256_wrapper_t* w, uint8_t time)
+{
+    if (!ads1256_start_readc(w)) {
+        ESP_LOGE("APP_TASK", "Failed to start readc task");
+        return false;
+    }
 
-
-    ads1256_start_readc(dev);
+    if (!start_stopping_readc_task(time)) {
+        ESP_LOGE("APP_TASK", "Failed to start readc stop timer");
+        readc_stop_flag = true;
+        TaskHandle_t task = ads1256_wrapper_get_drdy_task(w);
+        if (task != NULL) xTaskNotifyGive(task);
+        return false;
+    }
 
     ESP_LOGI("APP_TASK", "Readc task started");
-
-    start_stopping_readc_task(time);
+    return true;
 }
 
 void app_task(void *arg) {
