@@ -95,7 +95,7 @@ typedef enum
     SPS_2P5 = DATA_RATE_REGISTER_2P5SPS
 } ads1256_sps_e;
 
-int ads1256_sps_hex_to_value(ads1256_sps_e sps);
+float ads1256_sps_hex_to_value(ads1256_sps_e sps);
 
 bool ads1256_single_transmit(ads1256_t* ads,const uint8_t* tx_data, size_t tx_length,uint8_t* rx_data, size_t rx_length);
 bool ads1256_set_value(ads1256_t* ads, uint8_t register_address, uint8_t value);

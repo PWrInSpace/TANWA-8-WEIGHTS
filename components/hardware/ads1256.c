@@ -10,7 +10,7 @@ struct ads1256_t {
     ads1256_pin_config_t pins;
 };
 
-int ads1256_sps_hex_to_value(ads1256_sps_e sps) {
+float ads1256_sps_hex_to_value(ads1256_sps_e sps) {
     switch (sps) {
         case DATA_RATE_REGISTER_30000SPS:
             return 30000;
@@ -37,7 +37,7 @@ int ads1256_sps_hex_to_value(ads1256_sps_e sps) {
         case DATA_RATE_REGISTER_5SPS:
             return 5;
         case DATA_RATE_REGISTER_2P5SPS:
-            return 205;
+            return 2.5;
         default:
             ESP_LOGE(TAG, "Invalid SPS value");
             return -1;

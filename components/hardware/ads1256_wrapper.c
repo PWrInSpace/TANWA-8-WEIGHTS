@@ -554,7 +554,7 @@ void ads1256_print_data(ads1256_wrapper_t* w)
 void ads1256_get_config_info(ads1256_wrapper_t* w)
 {
     ESP_LOGI(TAG, "Active Channel: %d", w->active_channel);
-    ESP_LOGI(TAG, "Samples per Second: %d", ads1256_sps_hex_to_value(w->sps));
+    ESP_LOGI(TAG, "Samples per Second: %.1f", ads1256_sps_hex_to_value(w->sps));
 
     for (int i = 0; i < 4; i++) {
         ads1256_channel_t* channel = &w->channels[i];
