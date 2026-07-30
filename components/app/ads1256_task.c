@@ -83,7 +83,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-        uint8_t cs_pin = ads1256_get_pin_config(ads1256_wrapper_get_hal(w))->cs_gpio;
+        uint8_t cs_pin = ads1256_get_pin_config(ads1256_wrapper_get_dev(w))->cs_gpio;
         if(!_ads1256_spi_transmit_queued(cs_pin, dummy_data, sizeof(dummy_data), buffer_readc_current[buffer_readc_index].data, 3))
         {
             ESP_LOGE("ADS1256", "Failed to read data from ADS1256");
@@ -135,7 +135,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
     new_filename_flag = true;
     ESP_LOGI("ADS1256", "Stopping continuous read task");
 
-    ads1256_stop_continuous_read(ads1256_wrapper_get_hal(w));
+    ads1256_stop_continuous_read(ads1256_wrapper_get_dev(w));
     ads1256_wrapper_set_drdy_task(w, NULL);
     vTaskDelete(NULL);
 
@@ -167,7 +167,7 @@ bool ads1256_start_readc(ads1256_wrapper_t* w)
     args->w = w;
 
     if (!ads1256_start_continuous_read(
-            ads1256_wrapper_get_hal(w))) {
+            ads1256_wrapper_get_dev(w))) {
         ESP_LOGE("ADS1256", "Failed to enable continuous mode");
         free(args);
         return false;
@@ -184,7 +184,7 @@ bool ads1256_start_readc(ads1256_wrapper_t* w)
             &task_handle) != pdPASS) {
         ESP_LOGE("ADS1256", "Failed to create readc task");
         ads1256_stop_continuous_read(
-            ads1256_wrapper_get_hal(w));
+            ads1256_wrapper_get_dev(w));
         free(args);
         return false;
     }
@@ -207,15 +207,15 @@ void ads1256_data_from_channels(void*  pvParameters)
     uint8_t batch_index = 0;
 
     ads1256_change_channel(w, 0);
-    ads1256_sync(ads1256_wrapper_get_hal(w));
-    ads1256_wake_up(ads1256_wrapper_get_hal(w));
+    ads1256_sync(ads1256_wrapper_get_dev(w));
+    ads1256_wake_up(ads1256_wrapper_get_dev(w));
 
     while (!read_mux_stop_flag)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
         uint8_t raw_data[3] = {0, 0, 0};
-        if (!ads1256_get_raw_data(ads1256_wrapper_get_hal(w), raw_data) ||
+        if (!ads1256_get_raw_data(ads1256_wrapper_get_dev(w), raw_data) ||
             !ads1256_raw_data_to_value(w, raw_data, &data.weight[cur], cur)) {
             ESP_LOGE("ADS1256", "Failed to read channel %d", cur);
         }
@@ -230,8 +230,8 @@ void ads1256_data_from_channels(void*  pvParameters)
         }
 
         ads1256_change_channel(w, cur);
-        ads1256_sync(ads1256_wrapper_get_hal(w));
-        ads1256_wake_up(ads1256_wrapper_get_hal(w));
+        ads1256_sync(ads1256_wrapper_get_dev(w));
+        ads1256_wake_up(ads1256_wrapper_get_dev(w));
     }
 
     ads1256_wrapper_set_drdy_task(w, NULL);
@@ -313,10 +313,28 @@ void ads1256_delete_task(ads1256_wrapper_t* w)
 
     TaskHandle_t task_handle = ads1256_wrapper_get_drdy_task(w);
 
-    if (task_handle != NULL) {
-        ads1256_wrapper_set_drdy_task(w, NULL);
-        ESP_LOGI("ADS1256", "Deleted task");
-    } else {
+    if (task_handle == NULL) {
         ESP_LOGE("ADS1256", "Task handle is NULL, cannot delete task");
+        return;
+    }
+
+    read_mux_stop_flag = true;
+    readc_stop_flag = true;
+
+    xTaskNotifyGive(task_handle);
+
+    for (int i = 0; i < 50; i++) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        if (ads1256_wrapper_get_drdy_task(w) == NULL) {
+            ESP_LOGI("ADS1256", "Task stopped successfully");
+            return;
+        }
+    }
+
+    task_handle = ads1256_wrapper_get_drdy_task(w);
+    if (task_handle != NULL) {
+        ESP_LOGW("ADS1256", "Task did not stop in time, forcing delete");
+        vTaskDelete(task_handle);
+        ads1256_wrapper_set_drdy_task(w, NULL);
     }
 }

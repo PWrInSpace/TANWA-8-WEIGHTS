@@ -4,11 +4,12 @@
 #include "driver/gpio.h"
 #include "flash.h"
 #include <string.h>
+#include <stdlib.h>
 
 #define TAG "ads1256"
 
 struct ads1256_wrapper_t {
-    ads1256_t* hal; //Hardware Abstraction Layer, think about the name :/
+    ads1256_t* dev; 
     ads1256_channel_t channels[4];
     uint8_t active_channel;
     ads1256_sps_e sps;
@@ -97,13 +98,13 @@ static void IRAM_ATTR gpio_isr_handler(void* arg) {
 }
 
 static bool setup_isr(ads1256_wrapper_t* w) {
-    esp_err_t res = gpio_isr_handler_add(ads1256_get_pin_config(w->hal)->drdy_gpio, gpio_isr_handler, w);
+    esp_err_t res = gpio_isr_handler_add(ads1256_get_pin_config(w->dev)->drdy_gpio, gpio_isr_handler, w);
     if (res != ESP_OK) {
-        ESP_LOGE("ISR", "Failed to attach ISR to %d GPIO", ads1256_get_pin_config(w->hal)->drdy_gpio);
+        ESP_LOGE("ISR", "Failed to attach ISR to %d GPIO", ads1256_get_pin_config(w->dev)->drdy_gpio);
         return false;
     }
 
-    ESP_LOGI("ISR", "ISR attached to GPIO %d", ads1256_get_pin_config(w->hal)->drdy_gpio);
+    ESP_LOGI("ISR", "ISR attached to GPIO %d", ads1256_get_pin_config(w->dev)->drdy_gpio);
     return true;
 }
 
@@ -153,20 +154,20 @@ static bool ads1256_pins_init(ads1256_pin_config_t* pin_config)
 
 ads1256_wrapper_t* ads1256_init(ads1256_pin_config_t* pin_config)
 {
-    ads1256_t* hal = NULL;
+    ads1256_t* dev = NULL;
     ads1256_wrapper_t* w = NULL;
     bool pins_initialized = false;
     bool isr_registered = false;
 
-    hal = ads1256_create(pin_config);
-    if (hal == NULL) { return NULL; }
+    dev = ads1256_create(pin_config);
+    if (dev == NULL) { return NULL; }
 
     w = calloc(1, sizeof(ads1256_wrapper_t));
-    if (w == NULL) { ads1256_destroy(hal); return NULL; }
+    if (w == NULL) { ads1256_destroy(dev); return NULL; }
 
-    w->hal = hal;
+    w->dev = dev;
     memcpy(w->channels, default_channels, sizeof(default_channels));
-    w->active_channel = 1;
+    w->active_channel = UINT8_MAX;
     w->sps = SPS_1000;
     w->drdy_task = NULL;
 
@@ -218,31 +219,31 @@ ads1256_wrapper_t* ads1256_init(ads1256_pin_config_t* pin_config)
         ESP_LOGW(TAG,"Calibration not available: %s. Using defaults", esp_err_to_name(config_result));
     }
 
-    if (!ads1256_reset(w->hal)) {
+    if (!ads1256_reset(w->dev)) {
         ESP_LOGE("ADS1256", "Failed to reset ADS1256");
         goto cleanup;
     }
     ESP_LOGI("ADS1256", "ADS1256 reset successfully");
 
-    if (!ads1256_set_value(w->hal, STATUS_REGISTER, STATUS_REGISTER_DEFAULT)) {
+    if (!ads1256_set_value(w->dev, STATUS_REGISTER, STATUS_REGISTER_DEFAULT)) {
         ESP_LOGE("ADS1256", "Failed to set ADS1256 status register");
         goto cleanup;
     }
     ESP_LOGI("ADS1256", "ADS1256 status register set successfully");
 
-    if (!ads1256_set_value(w->hal, ADCON_REGISTER, ADCON_REGISTER_SETUP)) {
+    if (!ads1256_set_value(w->dev, ADCON_REGISTER, ADCON_REGISTER_SETUP)) {
         ESP_LOGE("ADS1256", "Failed to set ADS1256 ADCON register");
         goto cleanup;
     }
     ESP_LOGI("ADS1256", "ADS1256 ADCON register set successfully");
 
-    if (!ads1256_change_channel(w, w->active_channel)) {
+    if (!ads1256_change_channel(w, 1)) {
         ESP_LOGE("ADS1256", "Failed to change channel on dev");
         goto cleanup;
     }
     ESP_LOGI("ADS1256", "Channel changed to %d", w->channels[w->active_channel].channel_hex);
 
-    if (!ads1256_set_sps(w->hal, w->sps)) {
+    if (!ads1256_set_sps(w->dev, w->sps)) {
         ESP_LOGE("ADS1256", "Failed to set SPS");
         goto cleanup;
     }
@@ -261,7 +262,7 @@ cleanup:
         if (w->data_mutex) vSemaphoreDelete(w->data_mutex);
         free(w);
     }
-    ads1256_destroy(hal);
+    ads1256_destroy(dev);
     return NULL;
 }
 
@@ -279,7 +280,7 @@ void ads1256_deinit(ads1256_wrapper_t* w)
     }
 
     const ads1256_pin_config_t* pins =
-        ads1256_get_pin_config(w->hal);
+        ads1256_get_pin_config(w->dev);
 
     gpio_intr_disable(pins->drdy_gpio);
     gpio_isr_handler_remove(pins->drdy_gpio);
@@ -288,7 +289,7 @@ void ads1256_deinit(ads1256_wrapper_t* w)
         vSemaphoreDelete(w->data_mutex);
     }
 
-    ads1256_destroy(w->hal);
+    ads1256_destroy(w->dev);
     free(w);
 }
 
@@ -305,11 +306,11 @@ bool ads1256_change_channel(ads1256_wrapper_t* w, uint8_t channel)
 
     bool result = true;
 
-    result &= ads1256_set_value(w->hal, MUX_REGISTER, w->channels[channel].channel_hex);
+    result &= ads1256_set_value(w->dev, MUX_REGISTER, w->channels[channel].channel_hex);
 
     if(result) { w->active_channel = channel;}
 
-    result &= ads1256_set_calibration_registers(w->hal, w->channels[channel].OFC_REG, w->channels[channel].FSC_REG);
+    result &= ads1256_set_calibration_registers(w->dev, w->channels[channel].OFC_REG, w->channels[channel].FSC_REG);
 
     return result;
 }
@@ -318,9 +319,9 @@ bool ads1256_change_channel_and_read(ads1256_wrapper_t* w, uint8_t channel, floa
 {
     uint8_t raw_data[3] = {0, 0, 0};
     bool res = ads1256_change_channel(w, channel);
-    res &= ads1256_sync(w->hal);
-    res &= ads1256_wake_up(w->hal);
-    res &= ads1256_get_raw_data(w->hal, raw_data);
+    res &= ads1256_sync(w->dev);
+    res &= ads1256_wake_up(w->dev);
+    res &= ads1256_get_raw_data(w->dev, raw_data);
     res &= ads1256_raw_data_to_value(w, raw_data, value, channel);
 
     return res;
@@ -495,20 +496,39 @@ void ads1256_update_data_struct(
         return;
     }
 
-    ads1256_data_t averaged = {0};
+    if (num_samples > ADS1256_UPDATE_DATA_AVG_SAMPLES) {
+        ESP_LOGE(TAG, "num_samples exceeds buffer size");
+        return;
+    }
+
+    ads1256_data_t result = {0};
+    float temp[ADS1256_UPDATE_DATA_AVG_SAMPLES];
 
     for (int channel = 0; channel < 4; channel++) {
-        double sum = 0.0;
-
-        for (size_t sample = 0; sample < num_samples; sample++) {
-            sum += samples[sample].weight[channel];
+        for (size_t i = 0; i < num_samples; i++) {
+            temp[i] = samples[i].weight[channel];
         }
 
-        averaged.weight[channel] = (float)(sum / num_samples);
+        for (size_t i = 1; i < num_samples; i++) {
+            float key = temp[i];
+            size_t j = i;
+            while (j > 0 && temp[j - 1] > key) {
+                temp[j] = temp[j - 1];
+                j--;
+            }
+            temp[j] = key;
+        }
+
+        size_t mid = num_samples / 2;
+        if (num_samples % 2 == 0) {
+            result.weight[channel] = (temp[mid - 1] + temp[mid]) / 2.0f;
+        } else {
+            result.weight[channel] = temp[mid];
+        }
     }
 
     xSemaphoreTake(w->data_mutex, portMAX_DELAY);
-    w->data = averaged;
+    w->data = result;
     w->data_valid = true;
     xSemaphoreGive(w->data_mutex);
 }
@@ -565,9 +585,25 @@ void ads1256_get_config_info(ads1256_wrapper_t* w)
     }
 }
 
-ads1256_t* ads1256_wrapper_get_hal(ads1256_wrapper_t* w)
+bool ads1256_wrapper_set_sps(ads1256_wrapper_t* w, ads1256_sps_e sps)
 {
-    return w->hal;
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Wrapper is NULL");
+        return false;
+    }
+
+    if (!ads1256_set_sps(w->dev, (uint8_t)sps)) {
+        ESP_LOGE(TAG, "Failed to set SPS on device");
+        return false;
+    }
+
+    w->sps = sps;
+    return true;
+}
+
+ads1256_t* ads1256_wrapper_get_dev(ads1256_wrapper_t* w)
+{
+    return w->dev;
 }
 
 void ads1256_wrapper_set_drdy_task(ads1256_wrapper_t* w, TaskHandle_t task)

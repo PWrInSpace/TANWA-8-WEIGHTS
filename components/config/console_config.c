@@ -267,11 +267,16 @@ int change_mux_channel(int argc, char **argv)
         return -1;
     }
 
+    ads1256_suspend_task(w);
+
     if(!ads1256_change_channel(w, channel))
     {
         ESP_LOGE(TAG, "Channel change error");
+        ads1256_resume_task(w);
         return -1;
     }
+
+    ads1256_resume_task(w);
 
     ESP_LOGI(TAG, "Channel changed!");
     return 0;
@@ -300,10 +305,12 @@ int ads1256_get_samples(int argc, char **argv)
         return -1;
     }
 
+    ads1256_suspend_task(w);
+
     for(int i =0; i<samples; i++)
     {
         uint8_t raw_data[3];
-        ads1256_get_raw_data(ads1256_wrapper_get_hal(w), raw_data);
+        ads1256_get_raw_data(ads1256_wrapper_get_dev(w), raw_data);
         int32_t raw_value = (raw_data[0] << 16) | (raw_data[1] << 8) | raw_data[2];
         if (raw_value & 0x800000) {
             raw_value |= 0xFF000000;
@@ -313,6 +320,7 @@ int ads1256_get_samples(int argc, char **argv)
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
+    ads1256_resume_task(w);
     return 0;
 }
 
@@ -333,18 +341,22 @@ int read_id(int argc, char **argv)
         return -1;
     }
 
+    ads1256_suspend_task(w);
+
     uint8_t id;
     for(int i =0; i<50; i++)
     {
-        if(!ads1256_read_id(ads1256_wrapper_get_hal(w), &id))
+        if(!ads1256_read_id(ads1256_wrapper_get_dev(w), &id))
         {
             ESP_LOGE(TAG, "Failed to read ID from device %d", device);
+            ads1256_resume_task(w);
             return -1;
         }
         esp_rom_delay_us(10);
     }
 
     ESP_LOGI(TAG, "Device %d ID: 0x%02X", device, id);
+    ads1256_resume_task(w);
     return 0;
 }
 
@@ -386,13 +398,17 @@ int read_cal_registers(int argc, char **argv)
         return -1;
     }
 
-    if(!ads1256_read_cal_registers(ads1256_wrapper_get_hal(w)))
+    ads1256_suspend_task(w);
+
+    if(!ads1256_read_cal_registers(ads1256_wrapper_get_dev(w)))
     {
         ESP_LOGE(TAG, "Failed to read calibration registers");
+        ads1256_resume_task(w);
         return -1;
     }
 
     ESP_LOGI(TAG, "Calibration registers read successfully for device %d", device);
+    ads1256_resume_task(w);
     return 0;
 }
 
@@ -412,19 +428,24 @@ int calibrate_device(int argc, char **argv)
         return -1;
     }
 
-    if(!ads1256_self_cal(ads1256_wrapper_get_hal(w)))
+    ads1256_suspend_task(w);
+
+    if(!ads1256_self_cal(ads1256_wrapper_get_dev(w)))
     {
         ESP_LOGE(TAG, "Failed to perform self-calibration on device %d", device);
+        ads1256_resume_task(w);
         return -1;
     }
     ESP_LOGI(TAG, "Self-calibration completed successfully for device %d", device);
 
-    if(!ads1256_read_cal_registers(ads1256_wrapper_get_hal(w)))
+    if(!ads1256_read_cal_registers(ads1256_wrapper_get_dev(w)))
     {
         ESP_LOGE(TAG, "Failed to read calibration registers");
+        ads1256_resume_task(w);
         return -1;
     }
     ESP_LOGI(TAG, "Calibration registers read successfully for device %d", device);
+    ads1256_resume_task(w);
     return 0;
 }
 
@@ -444,12 +465,16 @@ int ads1256_reset_cli(int argc, char **argv)
         return -1;
     }
 
-    if(!ads1256_reset(ads1256_wrapper_get_hal(w)))
+    ads1256_suspend_task(w);
+
+    if(!ads1256_reset(ads1256_wrapper_get_dev(w)))
     {
         ESP_LOGE(TAG, "Failed to reset device %d", device);
+        ads1256_resume_task(w);
         return -1;
     }
     ESP_LOGI(TAG, "Device %d reset successfully", device);
+    ads1256_resume_task(w);
     return 0;
 }
 
@@ -491,12 +516,16 @@ int ads1256_set_sps_cmd(int argc, char **argv)
             return -1;
     }
 
-    if(!ads1256_set_sps(ads1256_wrapper_get_hal(w), sps_register_value))
+    ads1256_suspend_task(w);
+
+    if(!ads1256_wrapper_set_sps(w, (ads1256_sps_e)sps_register_value))
     {
         ESP_LOGE(TAG, "Failed to set data rate on device %d", device);
+        ads1256_resume_task(w);
         return -1;
     }
 
+    ads1256_resume_task(w);
     return 1;
 }
 

@@ -125,23 +125,21 @@ bool _ads1256_spi_transmit_queued(uint8_t cs_pin, const uint8_t* tx_data, size_t
 
     xSemaphoreTake(mutex_spi, portMAX_DELAY);
     gpio_set_level(cs_pin, 0);
+
     esp_err_t ret = spi_device_queue_trans(spi_config.spi_ads1256_handle, &trans, portMAX_DELAY);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "spi_device_queue_trans failed: %s", esp_err_to_name(ret));
-        // should return CS to HIGH before releasing mutex ?? if so add gpio_set_level(cs_pin, 1); next line
-        xSemaphoreGive(mutex_spi);
-        return false;
+        goto cleanup;
     }
 
     spi_transaction_t *ret_trans;
     ret = spi_device_get_trans_result(spi_config.spi_ads1256_handle, &ret_trans, portMAX_DELAY);
-    gpio_set_level(cs_pin, 1);
-    xSemaphoreGive(mutex_spi);
-
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "spi_device_get_trans_result failed: %s", esp_err_to_name(ret));
-        return false;
     }
 
-    return true;
+cleanup:
+    gpio_set_level(cs_pin, 1);
+    xSemaphoreGive(mutex_spi);
+    return ret == ESP_OK;
 }

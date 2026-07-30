@@ -44,7 +44,8 @@ bool ads1256_calibrate_channel(ads1256_wrapper_t* w, uint8_t channel, float weig
 bool ads1256_get_data_struct_copy(ads1256_wrapper_t* w, ads1256_data_t* data);
 void ads1256_update_data_struct(ads1256_wrapper_t* w, const ads1256_data_t* samples, size_t num_samples);
 
-ads1256_t* ads1256_wrapper_get_hal(ads1256_wrapper_t* w);
+ads1256_t* ads1256_wrapper_get_dev(ads1256_wrapper_t* w);
+bool ads1256_wrapper_set_sps(ads1256_wrapper_t* w, ads1256_sps_e sps);
 void ads1256_wrapper_set_drdy_task(ads1256_wrapper_t* w, TaskHandle_t task);
 
 void ads1256_print_data(ads1256_wrapper_t* w);
