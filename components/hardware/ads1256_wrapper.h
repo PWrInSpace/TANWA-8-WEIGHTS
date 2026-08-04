@@ -25,7 +25,7 @@ typedef struct ads1256_data_t
     float weight[4];
 } ads1256_data_t;
 
-#define ADS1256_UPDATE_DATA_AVG_SAMPLES 100
+#define ADS1256_UPDATE_DATA_AVG_SAMPLES 25
 
 ads1256_wrapper_t* ads1256_init(ads1256_pin_config_t* pin_config);
 void ads1256_deinit(ads1256_wrapper_t* w);

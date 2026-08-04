@@ -267,16 +267,19 @@ int change_mux_channel(int argc, char **argv)
         return -1;
     }
 
-    ads1256_suspend_task(w);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+        ESP_LOGE(TAG, "Failed to stop task");
+        return -1;
+    }
 
     if(!ads1256_change_channel(w, channel))
     {
         ESP_LOGE(TAG, "Channel change error");
-        ads1256_resume_task(w);
+        ads1256_start_channel_task(w);
         return -1;
     }
 
-    ads1256_resume_task(w);
+    ads1256_start_channel_task(w);
 
     ESP_LOGI(TAG, "Channel changed!");
     return 0;
@@ -305,7 +308,10 @@ int ads1256_get_samples(int argc, char **argv)
         return -1;
     }
 
-    ads1256_suspend_task(w);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+        ESP_LOGE(TAG, "Failed to stop task");
+        return -1;
+    }
 
     for(int i =0; i<samples; i++)
     {
@@ -320,7 +326,7 @@ int ads1256_get_samples(int argc, char **argv)
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
-    ads1256_resume_task(w);
+    ads1256_start_channel_task(w);
     return 0;
 }
 
@@ -341,7 +347,10 @@ int read_id(int argc, char **argv)
         return -1;
     }
 
-    ads1256_suspend_task(w);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+        ESP_LOGE(TAG, "Failed to stop task");
+        return -1;
+    }
 
     uint8_t id;
     for(int i =0; i<50; i++)
@@ -349,14 +358,14 @@ int read_id(int argc, char **argv)
         if(!ads1256_read_id(ads1256_wrapper_get_dev(w), &id))
         {
             ESP_LOGE(TAG, "Failed to read ID from device %d", device);
-            ads1256_resume_task(w);
+            ads1256_start_channel_task(w);
             return -1;
         }
         esp_rom_delay_us(10);
     }
 
     ESP_LOGI(TAG, "Device %d ID: 0x%02X", device, id);
-    ads1256_resume_task(w);
+    ads1256_start_channel_task(w);
     return 0;
 }
 
@@ -398,17 +407,20 @@ int read_cal_registers(int argc, char **argv)
         return -1;
     }
 
-    ads1256_suspend_task(w);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+        ESP_LOGE(TAG, "Failed to stop task");
+        return -1;
+    }
 
     if(!ads1256_read_cal_registers(ads1256_wrapper_get_dev(w)))
     {
         ESP_LOGE(TAG, "Failed to read calibration registers");
-        ads1256_resume_task(w);
+        ads1256_start_channel_task(w);
         return -1;
     }
 
     ESP_LOGI(TAG, "Calibration registers read successfully for device %d", device);
-    ads1256_resume_task(w);
+    ads1256_start_channel_task(w);
     return 0;
 }
 
@@ -428,12 +440,15 @@ int calibrate_device(int argc, char **argv)
         return -1;
     }
 
-    ads1256_suspend_task(w);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+        ESP_LOGE(TAG, "Failed to stop task");
+        return -1;
+    }
 
     if(!ads1256_self_cal(ads1256_wrapper_get_dev(w)))
     {
         ESP_LOGE(TAG, "Failed to perform self-calibration on device %d", device);
-        ads1256_resume_task(w);
+        ads1256_start_channel_task(w);
         return -1;
     }
     ESP_LOGI(TAG, "Self-calibration completed successfully for device %d", device);
@@ -441,11 +456,11 @@ int calibrate_device(int argc, char **argv)
     if(!ads1256_read_cal_registers(ads1256_wrapper_get_dev(w)))
     {
         ESP_LOGE(TAG, "Failed to read calibration registers");
-        ads1256_resume_task(w);
+        ads1256_start_channel_task(w);
         return -1;
     }
     ESP_LOGI(TAG, "Calibration registers read successfully for device %d", device);
-    ads1256_resume_task(w);
+    ads1256_start_channel_task(w);
     return 0;
 }
 
@@ -465,16 +480,19 @@ int ads1256_reset_cli(int argc, char **argv)
         return -1;
     }
 
-    ads1256_suspend_task(w);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+        ESP_LOGE(TAG, "Failed to stop task");
+        return -1;
+    }
 
     if(!ads1256_reset(ads1256_wrapper_get_dev(w)))
     {
         ESP_LOGE(TAG, "Failed to reset device %d", device);
-        ads1256_resume_task(w);
+        ads1256_start_channel_task(w);
         return -1;
     }
     ESP_LOGI(TAG, "Device %d reset successfully", device);
-    ads1256_resume_task(w);
+    ads1256_start_channel_task(w);
     return 0;
 }
 
@@ -486,7 +504,8 @@ int ads1256_set_sps_cmd(int argc, char **argv)
         return -1;
     }
     int device = atoi(argv[1]);
-    int sps_value = atoi(argv[2]);
+    double sps_raw = strtod(argv[2], NULL);
+    int sps_x10 = (int)(sps_raw * 10 + 0.5);
     uint8_t sps_register_value;
 
     ads1256_wrapper_t* w = board_get_ads1256(device);
@@ -496,37 +515,40 @@ int ads1256_set_sps_cmd(int argc, char **argv)
         return -1;
     }
 
-    switch(sps_value)
+    switch(sps_x10)
     {
-        case 205: sps_register_value = DATA_RATE_REGISTER_2P5SPS; break;
-        case 5: sps_register_value = DATA_RATE_REGISTER_5SPS; break;
-        case 10: sps_register_value = DATA_RATE_REGISTER_10SPS; break;
-        case 25: sps_register_value = DATA_RATE_REGISTER_25SPS; break;
-        case 50: sps_register_value = DATA_RATE_REGISTER_50SPS; break;
-        case 100: sps_register_value = DATA_RATE_REGISTER_100SPS; break;
-        case 500: sps_register_value = DATA_RATE_REGISTER_500SPS; break;
-        case 1000: sps_register_value = DATA_RATE_REGISTER_1000SPS; break;
-        case 2000: sps_register_value = DATA_RATE_REGISTER_2000SPS; break;
-        case 3750: sps_register_value = DATA_RATE_REGISTER_3750SPS; break;
-        case 7500: sps_register_value = DATA_RATE_REGISTER_7500SPS; break;
-        case 15000: sps_register_value = DATA_RATE_REGISTER_15000SPS; break;
-        case 30000: sps_register_value = DATA_RATE_REGISTER_30000SPS; break;
+        case 25:     sps_register_value = DATA_RATE_REGISTER_2P5SPS; break;    // 2.5 SPS
+        case 50:     sps_register_value = DATA_RATE_REGISTER_5SPS; break;      // 5 SPS
+        case 100:    sps_register_value = DATA_RATE_REGISTER_10SPS; break;     // 10 SPS
+        case 250:    sps_register_value = DATA_RATE_REGISTER_25SPS; break;     // 25 SPS
+        case 500:    sps_register_value = DATA_RATE_REGISTER_50SPS; break;     // 50 SPS
+        case 1000:   sps_register_value = DATA_RATE_REGISTER_100SPS; break;    // 100 SPS
+        case 5000:   sps_register_value = DATA_RATE_REGISTER_500SPS; break;    // 500 SPS
+        case 10000:  sps_register_value = DATA_RATE_REGISTER_1000SPS; break;   // 1000 SPS
+        case 20000:  sps_register_value = DATA_RATE_REGISTER_2000SPS; break;   // 2000 SPS
+        case 37500:  sps_register_value = DATA_RATE_REGISTER_3750SPS; break;   // 3750 SPS
+        case 75000:  sps_register_value = DATA_RATE_REGISTER_7500SPS; break;   // 7500 SPS
+        case 150000: sps_register_value = DATA_RATE_REGISTER_15000SPS; break;  // 15000 SPS
+        case 300000: sps_register_value = DATA_RATE_REGISTER_30000SPS; break;  // 30000 SPS
         default:
-            ESP_LOGE(TAG, "Invalid SPS value. Valid values are: 2.5 (205), 5, 10, 25, 50, 100, 500, 1000, 2000, 3750, 7500, 15000, 30000");
+            ESP_LOGE(TAG, "Invalid SPS value. Valid values are: 2.5, 5, 10, 25, 50, 100, 500, 1000, 2000, 3750, 7500, 15000, 30000");
             return -1;
     }
 
-    ads1256_suspend_task(w);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+        ESP_LOGE(TAG, "Failed to stop task");
+        return -1;
+    }
 
     if(!ads1256_wrapper_set_sps(w, (ads1256_sps_e)sps_register_value))
     {
         ESP_LOGE(TAG, "Failed to set data rate on device %d", device);
-        ads1256_resume_task(w);
+        ads1256_start_channel_task(w);
         return -1;
     }
 
-    ads1256_resume_task(w);
-    return 1;
+    ads1256_start_channel_task(w);
+    return 0;
 }
 
 int print_data(int argc, char **argv) {
@@ -547,7 +569,7 @@ int print_data(int argc, char **argv) {
     return 0;
 }
 
-int suspend_task(int argc, char **argv) {
+int stop_task(int argc, char **argv) {
     if(argc != 2) {
         ESP_LOGE(TAG, "Usage: command [dev_num]");
         return -1;
@@ -561,11 +583,14 @@ int suspend_task(int argc, char **argv) {
         return -1;
     }
 
-    ads1256_suspend_task(w);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+        ESP_LOGE(TAG, "Failed to stop task");
+        return -1;
+    }
     return 0;
 }
 
-int resume_task(int argc, char **argv) {
+int start_task(int argc, char **argv) {
     if(argc != 2) {
         ESP_LOGE(TAG, "Usage: command [dev_num]");
         return -1;
@@ -579,7 +604,10 @@ int resume_task(int argc, char **argv) {
         return -1;
     }
 
-    ads1256_resume_task(w);
+    if (!ads1256_start_channel_task(w)) {
+        ESP_LOGE(TAG, "Failed to start task");
+        return -1;
+    }
     return 0;
 }
 
@@ -619,9 +647,9 @@ static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
         { {"ads_dev_info",           "Display device configuration information. Usage: ads_dev_info [dev_num]",          NULL, dev_info,              NULL, NULL, NULL}, NULL },
         { {"ads_print_data",         "Print data from ADS1256 device. Usage: ads_print_data [dev_num]",                  NULL, print_data,            NULL, NULL, NULL}, NULL },
         { {"help",                   "Display this help message",                                                        NULL, help_cmd,              NULL, NULL, NULL}, NULL },
-        { {"ads_suspend_task",       "Suspend ADS1256 task. Usage: ads_suspend_task [dev_num]",                          NULL, suspend_task,          NULL, NULL, NULL}, NULL },
-        { {"ads_resume_task",        "Resume ADS1256 task. Usage: ads_resume_task [dev_num]",                            NULL, resume_task,           NULL, NULL, NULL}, NULL },
-        { {"ads_delete_task",        "Delete ADS1256 task. Usage: ads_delete_task [dev_num]",                            NULL, delete_task,            NULL, NULL, NULL}, NULL },
+        { {"ads_stop_task",          "Stop ADS1256 task. Usage: ads_stop_task [dev_num]",                                NULL, stop_task,             NULL, NULL, NULL}, NULL },
+        { {"ads_start_task",         "Start ADS1256 task. Usage: ads_start_task [dev_num]",                              NULL, start_task,            NULL, NULL, NULL}, NULL },
+        { {"ads_delete_task",        "Delete ADS1256 task. Usage: ads_delete_task [dev_num]",                            NULL, delete_task,           NULL, NULL, NULL}, NULL },
         { {"ads_read_id",            "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]",                        NULL, read_id,               NULL, NULL, NULL}, NULL },
         { {"ads_tare",               "Zero all sensors. Usage: ads_tare [dev_num]",                                      NULL, tare_cmd,              NULL, NULL, NULL}, NULL },
         { {"ads_calibrate_channel",  "Calibrate one channel. Usage: ads_calibrate_channel [dev_num] <channel> <weight>", NULL, calibrate_cmd,         NULL, NULL, NULL}, NULL },

@@ -35,8 +35,7 @@ bool ads1256_task_init(ads1256_wrapper_t* w);
 bool ads1256_start_readc(ads1256_wrapper_t* w);
 bool ads1256_start_channel_task(ads1256_wrapper_t* w);
 
-void ads1256_suspend_task(ads1256_wrapper_t* w);
-void ads1256_resume_task(ads1256_wrapper_t* w);
+bool ads1256_stop_task_and_wait(ads1256_wrapper_t* w, TickType_t timeout);
 void ads1256_delete_task(ads1256_wrapper_t* w);
 
 #endif

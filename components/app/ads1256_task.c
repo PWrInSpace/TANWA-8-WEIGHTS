@@ -149,14 +149,11 @@ bool ads1256_start_readc(ads1256_wrapper_t* w)
     }
 
     if (ads1256_wrapper_get_drdy_task(w) != NULL) {
-        read_mux_stop_flag = true;
-        vTaskDelay(pdMS_TO_TICKS(50));
-
-        if (ads1256_wrapper_get_drdy_task(w) != NULL) {
-            ESP_LOGE("ADS1256", "ADS1256 task is already running");
+        if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
+            ESP_LOGE("ADS1256", "Failed to stop existing task");
             return false;
-        }
     }
+}
 
     ads1256_task_args_t* args = malloc(sizeof(*args));
     if (args == NULL) {
@@ -270,38 +267,41 @@ bool ads1256_start_channel_task(ads1256_wrapper_t* w)
     return true;
 }
 
-void ads1256_suspend_task(ads1256_wrapper_t* w)
+bool ads1256_stop_task_and_wait(ads1256_wrapper_t* w, TickType_t timeout)
 {
     if (w == NULL) {
         ESP_LOGE("ADS1256", "ADS1256 wrapper is NULL");
-        return;
+        return false;
     }
 
     TaskHandle_t task_handle = ads1256_wrapper_get_drdy_task(w);
 
-    if (task_handle != NULL) {
-        vTaskSuspend(task_handle);
-        ESP_LOGI("ADS1256", "Suspended channel task");
-    } else {
-        ESP_LOGE("ADS1256", "Task handle is NULL, cannot suspend task");
-    }
-}
-
-void ads1256_resume_task(ads1256_wrapper_t* w)
-{
-    if (w == NULL) {
-        ESP_LOGE("ADS1256", "ADS1256 wrapper is NULL");
-        return;
+    if (task_handle == NULL) {
+        return true;
     }
 
-    TaskHandle_t task_handle = ads1256_wrapper_get_drdy_task(w);
+    read_mux_stop_flag = true;
+    readc_stop_flag = true;
 
-    if (task_handle != NULL) {
-        vTaskResume(task_handle);
-        ESP_LOGI("ADS1256", "Resumed channel task");
-    } else {
-        ESP_LOGE("ADS1256", "Task handle is NULL, cannot resume task");
+    xTaskNotifyGive(task_handle);
+
+    TickType_t start = xTaskGetTickCount();
+    while (ads1256_wrapper_get_drdy_task(w) != NULL) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+
+        if ((xTaskGetTickCount() - start) >= timeout) {
+            ESP_LOGE("ADS1256", "Task did not stop within timeout");
+            return false;
+        }
+
+        task_handle = ads1256_wrapper_get_drdy_task(w);
+        if (task_handle != NULL) {
+            xTaskNotifyGive(task_handle);
+        }
     }
+
+    ESP_LOGI("ADS1256", "Task stopped gracefully");
+    return true;
 }
 
 void ads1256_delete_task(ads1256_wrapper_t* w)
@@ -311,30 +311,13 @@ void ads1256_delete_task(ads1256_wrapper_t* w)
         return;
     }
 
-    TaskHandle_t task_handle = ads1256_wrapper_get_drdy_task(w);
-
-    if (task_handle == NULL) {
-        ESP_LOGE("ADS1256", "Task handle is NULL, cannot delete task");
+    if (ads1256_wrapper_get_drdy_task(w) == NULL) {
+        ESP_LOGW("ADS1256", "No task running");
         return;
     }
 
-    read_mux_stop_flag = true;
-    readc_stop_flag = true;
-
-    xTaskNotifyGive(task_handle);
-
-    for (int i = 0; i < 50; i++) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-        if (ads1256_wrapper_get_drdy_task(w) == NULL) {
-            ESP_LOGI("ADS1256", "Task stopped successfully");
-            return;
-        }
-    }
-
-    task_handle = ads1256_wrapper_get_drdy_task(w);
-    if (task_handle != NULL) {
-        ESP_LOGW("ADS1256", "Task did not stop in time, forcing delete");
-        vTaskDelete(task_handle);
-        ads1256_wrapper_set_drdy_task(w, NULL);
+    if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(5000))) {
+        ESP_LOGE("ADS1256", "CRITICAL: Task did not stop after 5s, "
+                 "system may be in inconsistent state");
     }
 }
