@@ -135,7 +135,7 @@ void ads1256_read_data_continuously(void*  pvParameters)
     new_filename_flag = true;
     ESP_LOGI("ADS1256", "Stopping continuous read task");
 
-    ads1256_stop_continuous_read(ads1256_wrapper_get_dev(w));
+    ads1256_send_command(ads1256_wrapper_get_dev(w), SDATAC_COMMAND, 0);
     ads1256_wrapper_set_drdy_task(w, NULL);
     vTaskDelete(NULL);
 
@@ -163,8 +163,8 @@ bool ads1256_start_readc(ads1256_wrapper_t* w)
 
     args->w = w;
 
-    if (!ads1256_start_continuous_read(
-            ads1256_wrapper_get_dev(w))) {
+    if (!ads1256_send_command(
+            ads1256_wrapper_get_dev(w), RDATAC_COMMAND, 0)) {
         ESP_LOGE("ADS1256", "Failed to enable continuous mode");
         free(args);
         return false;
@@ -180,8 +180,8 @@ bool ads1256_start_readc(ads1256_wrapper_t* w)
             10,
             &task_handle) != pdPASS) {
         ESP_LOGE("ADS1256", "Failed to create readc task");
-        ads1256_stop_continuous_read(
-            ads1256_wrapper_get_dev(w));
+        ads1256_send_command(
+            ads1256_wrapper_get_dev(w), SDATAC_COMMAND, 0);
         free(args);
         return false;
     }
@@ -204,8 +204,8 @@ void ads1256_data_from_channels(void*  pvParameters)
     uint8_t batch_index = 0;
 
     ads1256_change_channel(w, 0);
-    ads1256_sync(ads1256_wrapper_get_dev(w));
-    ads1256_wake_up(ads1256_wrapper_get_dev(w));
+    ads1256_send_command(ads1256_wrapper_get_dev(w), SYNC_COMMAND, 0);
+    ads1256_send_command(ads1256_wrapper_get_dev(w), WAKEUP_COMMAND, 0);
 
     while (!read_mux_stop_flag)
     {
@@ -227,8 +227,8 @@ void ads1256_data_from_channels(void*  pvParameters)
         }
 
         ads1256_change_channel(w, cur);
-        ads1256_sync(ads1256_wrapper_get_dev(w));
-        ads1256_wake_up(ads1256_wrapper_get_dev(w));
+        ads1256_send_command(ads1256_wrapper_get_dev(w), SYNC_COMMAND, 0);
+        ads1256_send_command(ads1256_wrapper_get_dev(w), WAKEUP_COMMAND, 0);
     }
 
     ads1256_wrapper_set_drdy_task(w, NULL);
