@@ -93,7 +93,7 @@ void test_single_transmit_spi_failure(void) {
  * ========================================================================= */
 
 void test_send_command_reset_with_delay(void) {
-    TEST_ASSERT_TRUE(ads1256_send_command(s_ads, RESET_COMMAND, 100));
+    TEST_ASSERT_TRUE(ads1256_send_command(s_ads, RESET_COMMAND));
 
     size_t len;
     const uint8_t* tx = mock_spi_get_last_tx(&len);
@@ -103,7 +103,7 @@ void test_send_command_reset_with_delay(void) {
 }
 
 void test_send_command_selfcal_with_delay(void) {
-    TEST_ASSERT_TRUE(ads1256_send_command(s_ads, SELFCAL_COMMAND, 600));
+    TEST_ASSERT_TRUE(ads1256_send_command(s_ads, SELFCAL_COMMAND));
 
     size_t len;
     const uint8_t* tx = mock_spi_get_last_tx(&len);
@@ -113,12 +113,28 @@ void test_send_command_selfcal_with_delay(void) {
 }
 
 void test_send_command_wakeup_no_delay(void) {
-    TEST_ASSERT_TRUE(ads1256_send_command(s_ads, WAKEUP_COMMAND, 0));
+    TEST_ASSERT_TRUE(ads1256_send_command(s_ads, WAKEUP_COMMAND));
 
     size_t len;
     const uint8_t* tx = mock_spi_get_last_tx(&len);
     TEST_ASSERT_EQUAL_INT(1, len);
     TEST_ASSERT_EQUAL_HEX8(WAKEUP_COMMAND, tx[0]);
+    TEST_ASSERT_EQUAL_UINT32(0, mock_get_total_delay_ms());
+}
+
+void test_send_command_delay_override(void) {
+    TEST_ASSERT_TRUE(ads1256_send_command_delay(s_ads, RESET_COMMAND, 200));
+
+    size_t len;
+    const uint8_t* tx = mock_spi_get_last_tx(&len);
+    TEST_ASSERT_EQUAL_INT(1, len);
+    TEST_ASSERT_EQUAL_HEX8(RESET_COMMAND, tx[0]);
+    TEST_ASSERT_EQUAL_UINT32(200, mock_get_total_delay_ms());
+}
+
+void test_send_command_no_delay_on_spi_fail(void) {
+    mock_spi_set_fail(true);
+    TEST_ASSERT_FALSE(ads1256_send_command(s_ads, RESET_COMMAND));
     TEST_ASSERT_EQUAL_UINT32(0, mock_get_total_delay_ms());
 }
 
@@ -263,6 +279,8 @@ int main(void) {
     RUN_TEST(test_send_command_reset_with_delay);
     RUN_TEST(test_send_command_selfcal_with_delay);
     RUN_TEST(test_send_command_wakeup_no_delay);
+    RUN_TEST(test_send_command_delay_override);
+    RUN_TEST(test_send_command_no_delay_on_spi_fail);
 
     RUN_TEST(test_set_value_formats_wreg_command);
     RUN_TEST(test_read_register_formats_rreg_command);

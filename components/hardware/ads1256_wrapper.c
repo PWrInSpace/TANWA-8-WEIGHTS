@@ -219,7 +219,7 @@ ads1256_wrapper_t* ads1256_init(ads1256_pin_config_t* pin_config)
         ESP_LOGW(TAG,"Calibration not available: %s. Using defaults", esp_err_to_name(config_result));
     }
 
-    if (!ads1256_send_command(w->dev, RESET_COMMAND, 100)) {
+    if (!ads1256_send_command(w->dev, RESET_COMMAND)) {
         ESP_LOGE("ADS1256", "Failed to reset ADS1256");
         goto cleanup;
     }
@@ -319,8 +319,8 @@ bool ads1256_change_channel_and_read(ads1256_wrapper_t* w, uint8_t channel, floa
 {
     uint8_t raw_data[3] = {0, 0, 0};
     bool res = ads1256_change_channel(w, channel);
-    res &= ads1256_send_command(w->dev, SYNC_COMMAND, 0);
-    res &= ads1256_send_command(w->dev, WAKEUP_COMMAND, 0);
+    res &= ads1256_send_command(w->dev, SYNC_COMMAND);
+    res &= ads1256_send_command(w->dev, WAKEUP_COMMAND);
     res &= ads1256_get_raw_data(w->dev, raw_data);
     res &= ads1256_raw_data_to_value(w, raw_data, value, channel);
 

@@ -2,7 +2,7 @@
 #include "mcu_spi_config.h"
 #include "esp_log.h"
 #include <string.h>
-
+#include <stdlib.h>
 #define TAG "ads1256"
 
 
@@ -143,12 +143,39 @@ bool ads1256_set_calibration_registers(ads1256_t* ads, const uint8_t ofc[3], con
     return result;
 }
 
-bool ads1256_send_command(ads1256_t* ads, uint8_t command, uint32_t delay_ms)
+static uint32_t ads1256_default_delay(uint8_t cmd) {
+    switch (cmd) {
+        case RESET_COMMAND:    return 100;
+        case SELFCAL_COMMAND:
+        case SELFOCAL_COMMAND:
+        case SELFGCAL_COMMAND:
+        case SYSOCAL_COMMAND:
+        case SYSGCAL_COMMAND:  return 600;
+        default:               return 0; 
+    }
+}
+
+bool ads1256_send_command(ads1256_t* ads, uint8_t command)
 {
     const uint8_t tx = command;
     bool result = ads1256_single_transmit(ads, &tx, sizeof(tx), NULL, 0);
 
-    if (delay_ms > 0) {
+    if (result) {
+        uint32_t delay_ms = ads1256_default_delay(command);
+        if (delay_ms > 0) {
+            vTaskDelay(pdMS_TO_TICKS(delay_ms));
+        }
+    }
+
+    return result;
+}
+
+bool ads1256_send_command_delay(ads1256_t* ads, uint8_t command, uint32_t delay_ms)
+{
+    const uint8_t tx = command;
+    bool result = ads1256_single_transmit(ads, &tx, sizeof(tx), NULL, 0);
+
+    if (result && delay_ms > 0) {
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
 

@@ -54,5 +54,6 @@ dkms.conf
 .vscode
 .devcontainer
 build
+test/build/
 sdkconfig
 sdkconfig.old

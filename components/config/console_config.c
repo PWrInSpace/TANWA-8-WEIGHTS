@@ -445,7 +445,7 @@ int calibrate_device(int argc, char **argv)
         return -1;
     }
 
-    if(!ads1256_send_command(ads1256_wrapper_get_dev(w), SELFCAL_COMMAND, 600))
+    if(!ads1256_send_command(ads1256_wrapper_get_dev(w), SELFCAL_COMMAND))
     {
         ESP_LOGE(TAG, "Failed to perform self-calibration on device %d", device);
         ads1256_start_channel_task(w);
@@ -485,7 +485,7 @@ int ads1256_reset_cli(int argc, char **argv)
         return -1;
     }
 
-    if(!ads1256_send_command(ads1256_wrapper_get_dev(w), RESET_COMMAND, 100))
+    if(!ads1256_send_command(ads1256_wrapper_get_dev(w), RESET_COMMAND))
     {
         ESP_LOGE(TAG, "Failed to reset device %d", device);
         ads1256_start_channel_task(w);
