@@ -2,7 +2,6 @@
 #include "mcu_spi_config.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
-#include "flash.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -195,30 +194,6 @@ ads1256_wrapper_t* ads1256_init(ads1256_pin_config_t* pin_config)
         goto cleanup;
     }
 
-    data_config_t cfg;
-    esp_err_t config_result = flash_read(&cfg);
-
-    if (config_result == ESP_ERR_NVS_NOT_INITIALIZED) {
-        ESP_LOGE(TAG, "NVS is not initialized");
-        goto cleanup;
-    }
-
-    if (config_result == ESP_OK) {
-        w->channels[0].zero_offset = cfg.weight_cfg.zero_offset_1;
-        w->channels[0].factor = cfg.weight_cfg.factor_1;
-        w->channels[1].zero_offset = cfg.weight_cfg.zero_offset_2;
-        w->channels[1].factor = cfg.weight_cfg.factor_2;
-        w->channels[2].zero_offset = cfg.weight_cfg.zero_offset_3;
-        w->channels[2].factor = cfg.weight_cfg.factor_3;
-        w->channels[3].zero_offset = cfg.weight_cfg.zero_offset_4;
-        w->channels[3].factor = cfg.weight_cfg.factor_4;
-
-        ESP_LOGI(TAG, "Loaded weight calibration from NVS");
-    } 
-    else {
-        ESP_LOGW(TAG,"Calibration not available: %s. Using defaults", esp_err_to_name(config_result));
-    }
-
     if (!ads1256_send_command(w->dev, RESET_COMMAND)) {
         ESP_LOGE("ADS1256", "Failed to reset ADS1256");
         goto cleanup;
@@ -291,6 +266,16 @@ void ads1256_deinit(ads1256_wrapper_t* w)
 
     ads1256_destroy(w->dev);
     free(w);
+}
+
+bool ads1256_load_calibration(ads1256_wrapper_t* w, const ads1256_calibration_t cal[4]) {
+    if (w == NULL || cal == NULL) return false;
+    for (int i = 0; i < 4; i++) {
+        w->channels[i].zero_offset = cal[i].zero_offset;
+        w->channels[i].factor = cal[i].factor;
+    }
+    ESP_LOGI(TAG, "Calibration loaded externally");
+    return true;
 }
 
 bool ads1256_change_channel(ads1256_wrapper_t* w, uint8_t channel)
@@ -396,40 +381,28 @@ bool ads1256_tare(ads1256_wrapper_t* w)
 }
 
 bool ads1256_tare_all(ads1256_wrapper_t* w){
-
     ads1256_data_t data;
     if(!ads1256_get_data_struct_copy(w, &data)){
         ESP_LOGE(TAG,"Failed to read data for tare");
         return false;
     }
-
     for (int ch=0;ch<4;ch++){
         float factor = w->channels[ch].factor;
         int32_t zero = w->channels[ch].zero_offset;
-        int32_t new_zero = (int32_t)(data.weight[ch]*factor) +zero;
+        int32_t new_zero = (int32_t)(data.weight[ch]*factor) + zero;
         w->channels[ch].zero_offset = new_zero;
     }
-
-    data_config_t cfg;
-    if (flash_get_runtime_config(&cfg) !=ESP_OK){
-        ESP_LOGE(TAG,"Failed to read nvs config");
-        return false;
-    }
-
-    cfg.weight_cfg.zero_offset_1 = w->channels[0].zero_offset;
-    cfg.weight_cfg.zero_offset_2 = w->channels[1].zero_offset;
-    cfg.weight_cfg.zero_offset_3 = w->channels[2].zero_offset;
-    cfg.weight_cfg.zero_offset_4 = w->channels[3].zero_offset;
-    
-    if(flash_edit_config(cfg)!=ESP_OK){
-        ESP_LOGE(TAG,"Failed to update runtime config");
-        return false;
-    }
-
     ESP_LOGI(TAG, "Tare complete");
-    ESP_LOGI(TAG, "Saved to RAM only. Use save_flash to persist.");
     return true;
+}
 
+bool ads1256_get_calibration(ads1256_wrapper_t* w, ads1256_calibration_t cal[4]) {
+    if (w == NULL || cal == NULL) return false;
+    for (int i = 0; i < 4; i++) {
+        cal[i].zero_offset = w->channels[i].zero_offset;
+        cal[i].factor = w->channels[i].factor;
+    }
+    return true;
 }
 
 bool ads1256_calibrate_channel(ads1256_wrapper_t* w, uint8_t channel, float weight){
@@ -457,33 +430,11 @@ bool ads1256_calibrate_channel(ads1256_wrapper_t* w, uint8_t channel, float weig
     //factor=(raw-zero offset) / known weight
     float new_factor = (float)raw_diff / weight;
     w->channels[channel].factor = new_factor;
-
-    data_config_t cfg;
-    if(flash_get_runtime_config(&cfg)!=ESP_OK){
-        ESP_LOGE(TAG,"Failed to read nvs config");
-        return false;
-    }
-
-    switch(channel){
-        case 0: cfg.weight_cfg.factor_1 = new_factor; break;
-        case 1: cfg.weight_cfg.factor_2 = new_factor; break;
-        case 2: cfg.weight_cfg.factor_3 = new_factor; break;
-        case 3: cfg.weight_cfg.factor_4 = new_factor; break;
-        default: return false;
-    }
-
-    if(flash_edit_config(cfg) !=ESP_OK){
-        ESP_LOGE(TAG,"Failed to update runtime config");
-        return false;
-    }
-
-
-    ESP_LOGI(TAG, "Calibration complted: channel %d, factor %.6f", channel, new_factor);
-    ESP_LOGI(TAG, "Saved to RAM only. Use save_flash to persist.");
+    ESP_LOGI(TAG, "Calibration complete: channel %d, factor %.6f", channel, new_factor);
     return true;
 
-
 }
+
 
 void ads1256_update_data_struct(
     ads1256_wrapper_t* w,

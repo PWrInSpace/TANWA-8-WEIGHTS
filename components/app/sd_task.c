@@ -15,31 +15,30 @@ TaskHandle_t weight_sd_task = NULL;
 volatile bool new_filename_flag = false;
 
 
-void get_next_log_filename(char *out_name, size_t max_len)
+void get_next_log_filename(char *out_name, size_t max_len, const char* prefix)
 {
     DIR *dir = opendir(MOUNT_POINT);
     struct dirent *entry;
     int max_index = 0;
+    char pattern[32];
+    snprintf(pattern, sizeof(pattern), "%s_%%03d.txt", prefix);
 
     if (dir == NULL) {
-        printf("Failed to open dir\n");
-        snprintf(out_name, max_len, "%s/log_001.txt", MOUNT_POINT);
+        snprintf(out_name, max_len, "%s/%s_001.txt", MOUNT_POINT, prefix);
         return;
     }
 
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_REG) {
             int index;
-            if (sscanf(entry->d_name, "LOG_%03d.txt", &index) == 1) {
-                if (index > max_index) {
-                    max_index = index;
-                }
+            if (sscanf(entry->d_name, pattern, &index) == 1) {
+                if (index > max_index) max_index = index;
             }
         }
     }
     closedir(dir);
 
-    snprintf(out_name, max_len, "%s/log_%03d.txt", MOUNT_POINT, max_index + 1);
+    snprintf(out_name, max_len, "%s/%s_%03d.txt", MOUNT_POINT, prefix, max_index + 1);
 }
 
 esp_err_t sd_task_init(void) {
@@ -169,7 +168,7 @@ void save_buffer(const char* path, readc_frame_t *buffer, size_t length) {
 void save_weight_task(void *arg)
 {
     char file_path[64];
-     get_next_log_filename(file_path, sizeof(file_path));
+     get_next_log_filename(file_path, sizeof(file_path), "ads1_wt");
      ESP_LOGI(TAG, "Saving weight data to %s", file_path);
 
      save_header_as_text(file_path, "Weight Data\n");
@@ -219,7 +218,7 @@ void delete_weight_sd_task()
 void save_ads1256_buffor_task(void *arg)
 {
     char file_path[64];
-    get_next_log_filename(file_path, sizeof(file_path));
+    get_next_log_filename(file_path, sizeof(file_path), "ads1_log");
     ESP_LOGI(TAG, "Saving ADS1256 buffer to %s", file_path);
     
     ESP_LOGI(TAG, "Starting SD card save task");
@@ -231,7 +230,7 @@ void save_ads1256_buffor_task(void *arg)
         if(new_filename_flag)
         {
             new_filename_flag = false;
-            get_next_log_filename(file_path, sizeof(file_path));
+            get_next_log_filename(file_path, sizeof(file_path), "ads1_log");
             ESP_LOGI(TAG, "New filename set: %s", file_path);
         }
         

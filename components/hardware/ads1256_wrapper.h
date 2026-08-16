@@ -27,7 +27,15 @@ typedef struct ads1256_data_t
 
 #define ADS1256_UPDATE_DATA_AVG_SAMPLES 25
 
+typedef struct {
+    int32_t zero_offset;
+    float factor;
+} ads1256_calibration_t;
+
 ads1256_wrapper_t* ads1256_init(ads1256_pin_config_t* pin_config);
+bool ads1256_load_calibration(ads1256_wrapper_t* w, const ads1256_calibration_t cal[4]);
+bool ads1256_get_calibration(ads1256_wrapper_t* w, ads1256_calibration_t cal[4]);
+
 void ads1256_deinit(ads1256_wrapper_t* w);
 
 bool ads1256_change_channel(ads1256_wrapper_t* w, uint8_t channel);

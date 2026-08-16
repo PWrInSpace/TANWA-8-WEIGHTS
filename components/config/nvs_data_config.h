@@ -20,4 +20,16 @@
     DATA(factor_4, float, 1.0) \
     SECTION_END(weight_cfg) \
     DATA(operation_mode, char, 'D')
+/* Uncomment below and add backslash after DATA(operation_mode...) to add another ads1256:
+    SECTION_BEGIN(weight_cfg_2)
+    DATA(zero_offset_1, int32_t, 0)
+    DATA(factor_1, float, 1.0)
+    DATA(zero_offset_2, int32_t, 0)
+    DATA(factor_2, float, 1.0)
+    DATA(zero_offset_3, int32_t, 0)
+    DATA(factor_3, float, 1.0)
+    DATA(zero_offset_4, int32_t, 0)
+    DATA(factor_4, float, 1.0)
+    SECTION_END(weight_cfg_2)
+*/
 // jeżeli ktokolwiek usunie tą linie to kompilator zacznie drzeć ryja (chyba że dodasz pustą linię po ostatniej definicji :)

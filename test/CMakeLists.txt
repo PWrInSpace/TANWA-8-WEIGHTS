@@ -28,5 +28,14 @@ add_executable(test_ads1256
     test_ads1256.c
 )
 
+add_executable(test_ads1256_wrapper
+    ${UNITY_DIR}/unity.c
+    ${MOCKS_DIR}/mock_spi.c
+    ${PROJECT_ROOT}/components/hardware/ads1256.c
+    ${PROJECT_ROOT}/components/hardware/ads1256_wrapper.c
+    test_ads1256_wrapper.c
+)
+
 enable_testing()
 add_test(NAME ads1256_tests COMMAND test_ads1256)
+add_test(NAME ads1256_wrapper_tests COMMAND test_ads1256_wrapper)

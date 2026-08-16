@@ -50,9 +50,14 @@ board_config_t config = {
 };
 
 static ads1256_wrapper_t* ads1 = NULL;
+//static ads1256_wrapper_t* ads2 = NULL;
 
 ads1256_wrapper_t* board_get_ads1256(int id) {
-    return id == 1 ? ads1 : NULL;
+    switch(id) {
+        case 1: return ads1;
+//        case 2: return ads2;
+        default: return NULL;
+    }
 }
 
 esp_err_t board_config_init(void) {
@@ -94,6 +99,29 @@ esp_err_t board_config_init(void) {
         ESP_LOGE(TAG, "Failed to initialize ADS1256 device 1");
         return ESP_FAIL;
     }
+
+    {
+        data_config_t cfg;
+        if (flash_get_runtime_config(&cfg) == ESP_OK) {
+            ads1256_calibration_t cal[4] = {
+                { cfg.weight_cfg.zero_offset_1, cfg.weight_cfg.factor_1 },
+                { cfg.weight_cfg.zero_offset_2, cfg.weight_cfg.factor_2 },
+                { cfg.weight_cfg.zero_offset_3, cfg.weight_cfg.factor_3 },
+                { cfg.weight_cfg.zero_offset_4, cfg.weight_cfg.factor_4 },
+            };
+            ads1256_load_calibration(ads1, cal);
+        }
+    }
+
+    //when need to add another ads1256
+    // ads2 = ads1256_init(&ads2_pins);
+    // {
+    //     ads1256_calibration_t cal[4] = {
+    //         { cfg.weight_cfg_2.zero_offset_1, cfg.weight_cfg_2.factor_1 },
+    //         ...
+    //     };
+    //     ads1256_load_calibration(ads2, cal);
+    // }
 
     if (!timers_init()) {
         ESP_LOGE(TAG, "Failed to initialize timers");

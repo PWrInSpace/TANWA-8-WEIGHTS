@@ -69,7 +69,22 @@ int tare_cmd(int argc, char **argv) {
         return 0;
     }
 
-    ESP_LOGI(TAG, "Tare complete");
+    {
+        data_config_t cfg;
+        if (flash_get_runtime_config(&cfg) == ESP_OK) {
+            ads1256_calibration_t cal[4];
+            ads1256_get_calibration(w, cal);
+            if (device == 1) {
+                cfg.weight_cfg.zero_offset_1 = cal[0].zero_offset;
+                cfg.weight_cfg.zero_offset_2 = cal[1].zero_offset;
+                cfg.weight_cfg.zero_offset_3 = cal[2].zero_offset;
+                cfg.weight_cfg.zero_offset_4 = cal[3].zero_offset;
+            }
+            flash_edit_config(cfg);
+        }
+    }
+
+    ESP_LOGI(TAG, "Tare OK. Use save_flash to persist.");
     return 0;
 }
 
@@ -102,7 +117,20 @@ int calibrate_cmd(int argc, char **argv){
         return 0;
     }
 
-    ESP_LOGI(TAG, "Calibration complete");
+    {
+        data_config_t cfg;
+        if (flash_get_runtime_config(&cfg) == ESP_OK) {
+            ads1256_calibration_t cal[4];
+            ads1256_get_calibration(w, cal);
+            cfg.weight_cfg.factor_1 = cal[0].factor;
+            cfg.weight_cfg.factor_2 = cal[1].factor;
+            cfg.weight_cfg.factor_3 = cal[2].factor;
+            cfg.weight_cfg.factor_4 = cal[3].factor;
+            flash_edit_config(cfg);
+        }
+    }
+
+    ESP_LOGI(TAG, "Calibration complete. Use save_flash to persist.");
     return 0;
 }
 
