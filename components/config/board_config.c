@@ -88,12 +88,10 @@ esp_err_t board_config_init(void) {
         return err;
     }
 
-    if(!ads1256_task_init())
-    {
+    if (!ads1256_task_init()) {
         ESP_LOGE(TAG, "Failed to initialize ADS1256 task");
         return ESP_FAIL;
     }
-
 
     err = mcu_twai_init();
 
@@ -114,14 +112,14 @@ esp_err_t board_config_init(void) {
         return err;
     }
 
-    // err = sd_task_init();
+    err = sd_task_init();
 
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(TAG, "SD task initialization failed");
-    //     return err;
-    // }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "SD task initialization failed");
+        return err;
+    }
 
-    // run_weight_sd_task();
+    run_weight_sd_task();
 
 
     

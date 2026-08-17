@@ -50,17 +50,32 @@ int reset_device(int argc, char **argv) {
 }
 
 int tare_cmd(int argc, char **argv) {
-    if (argc != 1) {
-        ESP_LOGE(TAG, "Usage: tare");
+    if (argc == 1) {
+        if (!ads1256_tare_all(ADS1256_DEVICE_1)) {
+            ESP_LOGE(TAG, "Tare failed");
+            return 0;
+        }
+        ESP_LOGI(TAG, "Tare all channels complete");
         return 0;
     }
 
-    if (!ads1256_tare_all(ADS1256_DEVICE_1)) {
-        ESP_LOGE(TAG, "Tare failed");
+    if (argc != 2) {
+        ESP_LOGE(TAG, "Usage: tare [channel]");
         return 0;
     }
 
-    ESP_LOGI(TAG, "Tare complete");
+    int channel = atoi(argv[1]);
+    if (channel < 0 || channel > 3) {
+        ESP_LOGE(TAG, "Channel must be in range 0...3");
+        return 0;
+    }
+
+    if (!ads1256_tare_channel(ADS1256_DEVICE_1, (uint8_t)channel)) {
+        ESP_LOGE(TAG, "Tare channel %d failed", channel);
+        return 0;
+    }
+
+    ESP_LOGI(TAG, "Tare channel %d complete", channel);
     return 0;
 }
 
@@ -702,7 +717,7 @@ int help_cmd(int argc, char **argv);
 {"ads_resume_task", "Resume ADS1256 task. Usage: ads_resume_task [dev_num]", NULL, resume_task, NULL, NULL, NULL},
 {"ads_delete_task", "Delete ADS1256 task. Usage: ads_delete_task [dev_num]", NULL, dlete_task, NULL, NULL, NULL},
 {"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
-{"tare", "Zero all sensors. Usage: tare", NULL, tare_cmd, NULL, NULL, NULL},
+{"tare", "Zero sensors. Usage: tare [channel 0-3]. Without channel tares all", NULL, tare_cmd, NULL, NULL, NULL},
 {"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
 {"read_flash", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
 {"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL},

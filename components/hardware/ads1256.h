@@ -158,7 +158,9 @@ bool ads1256_start_continuous_read(ads1256_device_t device);
 bool ads1256_get_data_struct_copy(ads1256_device_t device, ads1256_data_t* data);
 bool ads1256_hamownia_drut();
 bool ads1256_set_zero_offset(ads1256_device_t device, int32_t zero_offset, uint8_t channel_num);
+bool ads1256_tare(ads1256_device_t device);
 bool ads1256_tare_all(ads1256_device_t device);
+bool ads1256_tare_channel(ads1256_device_t device, uint8_t channel);
 bool ads1256_calibrate_channel(ads1256_device_t device, uint8_t channel, float weight);
 
 void ads1256_get_config_info(ads1256_device_t device);

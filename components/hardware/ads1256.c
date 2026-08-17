@@ -14,20 +14,9 @@ TaskHandle_t DRDY2_task = NULL;
 SemaphoreHandle_t data_dev1_mutex = NULL;
 SemaphoreHandle_t data_dev2_mutex = NULL;
 
-ads1256_channel_t ads1256_hamownia[4]  = {
-    {CHANNEL_1, 300, -136.6f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
-    // {CHANNEL_2, -3400, -32.5f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}, //moj 2
-    // {CHANNEL_3, -10000, -33.1f, {0x17, 0xF6, 0xFF}, {0x53, 0xBB, 0x49}}, //moj 3
 
-};
 
-// ads1256_channel_t ads1256_channels_dev1[4]  = { //kalibracja
-//     {CHANNEL_0, -10000, -3.31f, {0x17, 0xF6, 0xFF}, {0x53, 0xBB, 0x49}},
-//     // {CHANNEL_1, 1935, -148.9f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
-//     {CHANNEL_1, -300, -136.6f, {0x2C, 0xF6, 0xFF}, {0xCB, 0xBB, 0x49}}, //hamownia
-//     {CHANNEL_2, 10000, -2.9833f, {0xCF, 0xFE, 0xFF}, {0x3B, 0xAF, 0x49}}, //matka channel 1(2) xd
-//     {CHANNEL_3, 0, 1.0f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}}
-// };
+
 
 ads1256_channel_t ads1256_channels_dev1[4]  = { //dzialanie z com xd
     {CHANNEL_0, 0, 1.0f, {0x33, 0xF6, 0xFF}, {0xD1, 0xBA, 0x49}},
@@ -726,10 +715,18 @@ bool ads1256_get_data_struct_copy(ads1256_device_t device, ads1256_data_t* data)
     }
 
     if (device == ADS1256_DEVICE_1) {
+        if (data_dev1_mutex == NULL) {
+            ESP_LOGW(TAG, "ADS data mutex not ready");
+            return false;
+        }
         xSemaphoreTake(data_dev1_mutex, portMAX_DELAY);
         memcpy(data, &ads1256_data_dev1, sizeof(ads1256_data_t));
         xSemaphoreGive(data_dev1_mutex);
     } else if (device == ADS1256_DEVICE_2) {
+        if (data_dev2_mutex == NULL) {
+            ESP_LOGW(TAG, "ADS data mutex not ready");
+            return false;
+        }
         xSemaphoreTake(data_dev2_mutex, portMAX_DELAY);
         memcpy(data, &ads1256_data_dev2, sizeof(ads1256_data_t));
         xSemaphoreGive(data_dev2_mutex);
@@ -793,6 +790,63 @@ bool ads1256_tare(ads1256_device_t device)
     
 
     return ads1256_set_zero_offset(device, new_zero_offset, config->active_channel);
+}
+
+bool ads1256_tare_channel(ads1256_device_t device, uint8_t channel)
+{
+    if (device != ADS1256_DEVICE_1) {
+        ESP_LOGE(TAG, "tare supports only DEV1");
+        return false;
+    }
+
+    if (channel > 3) {
+        ESP_LOGE(TAG, "Invalid channel number: %d", channel);
+        return false;
+    }
+
+    ads1256_config_t* config;
+    if (!valid_and_set_dev_config(device, &config)) {
+        ESP_LOGE(TAG, "Invalid device config for device %d", ads1256_device_to_number(device));
+        return false;
+    }
+
+    ads1256_data_t data;
+    if (!ads1256_get_data_struct_copy(device, &data)) {
+        ESP_LOGE(TAG, "Failed to read data for tare");
+        return false;
+    }
+
+    float factor = config->channels[channel].factor;
+    int32_t zero = config->channels[channel].zero_offset;
+    int32_t new_zero = (int32_t)(data.weight[channel] * factor) + zero;
+    config->channels[channel].zero_offset = new_zero;
+
+    data_config_t cfg;
+    if (flash_get_runtime_config(&cfg) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read nvs config");
+        return false;
+    }
+
+    switch (channel) {
+        case 0: cfg.weight_cfg.zero_offset_1 = new_zero; break;
+        case 1: cfg.weight_cfg.zero_offset_2 = new_zero; break;
+        case 2: cfg.weight_cfg.zero_offset_3 = new_zero; break;
+        case 3: cfg.weight_cfg.zero_offset_4 = new_zero; break;
+        default: return false;
+    }
+
+    if (flash_edit_config(cfg) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to update runtime config");
+        return false;
+    }
+
+    if (flash_commit() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to commit nvs");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Tare channel %d complete, new zero_offset=%d", channel, (int)new_zero);
+    return true;
 }
 
 bool ads1256_tare_all(ads1256_device_t device){
@@ -911,16 +965,4 @@ bool ads1256_calibrate_channel(ads1256_device_t device, uint8_t channel, float w
     return true;
 
 
-}
-
-
-bool ads1256_hamownia_drut()
-{
-    ads1256_config_t* config = &ads1256_config_dev1;
-    ads1256_channel_t* channel = &ads1256_hamownia[0];
-
-    ads1256_set_value(MUX_REGISTER, channel->channel_hex, ADS1256_DEVICE_1);
-    ads1256_set_calibration_registers(ADS1256_DEVICE_1, channel->OFC_REG, channel->FSC_REG);
-
-    return true;
 }
