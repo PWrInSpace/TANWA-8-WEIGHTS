@@ -155,6 +155,53 @@ int save_flash_cmd(int argc, char **argv) {
     return 0;
 }
 
+int edit_flash_cmd(int argc, char **argv) {
+    if (argc < 3) {
+        printf("Usage: edit_flash <field> <value>\n");
+        return 0;
+    }
+
+    const char *field = argv[1];
+    const char *value = argv[2];
+
+    esp_err_t ret = flash_edit_field(field, value);
+    if (ret != ESP_OK) {
+        printf("Couldn't edit provided field\nErr: %s\n", esp_err_to_name(ret));
+        return 0;
+    }
+
+    printf("Successfully edited runtime config. Remember to use `flash_save_config` to save your changes\n");
+    return 0;
+}
+
+int restore_defaults(int argc, char **argv) {
+    esp_err_t ret;
+    ret = flash_restore_defaults();
+
+    if (ret != ESP_OK) {
+        printf("Couldn't restore config default values\nErr: %s\n", esp_err_to_name(ret));
+        return 0;
+    }
+
+    printf("Successfully restored config default values. Remember to use `flash_save_config` to save your changes\n");
+    return 0;
+}
+
+int erase_flash(int argc, char **argv) {
+    if (strcmp(argv[1], "Y") != 0) {
+        printf("Flash erase cancelled. You need to pass 'Y' as argument to confirm.\n");
+        return 0;
+    }
+
+    esp_err_t ret = flash_erase_config();
+    if (ret != ESP_OK) {
+        printf("Couldn't erase flash contents\nErr: %s\n", esp_err_to_name(ret));
+        return 0;
+    }
+
+    printf("Successfully erased flash contents\n");
+    return 0;
+}
 
 int read_mux_samples(int argc, char **argv) {
     if(argc != 3)
@@ -719,10 +766,12 @@ int help_cmd(int argc, char **argv);
 {"ads_read_id", "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]", NULL, read_id, NULL, NULL, NULL},
 {"tare", "Zero sensors. Usage: tare [channel 0-3]. Without channel tares all", NULL, tare_cmd, NULL, NULL, NULL},
 {"calibrate", "Calibrate one channel. Usage: calibrate <channel> <weight>", NULL, calibrate_cmd, NULL, NULL, NULL},
-{"read_flash", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
-{"display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL},
-{"save_flash", "Saves current runtime config to flash memory.", NULL, save_flash_cmd, NULL, NULL, NULL}
-
+{"flash_read", "Reads and displays saved data in flash memory.", NULL, read_flash_cmd, NULL, NULL, NULL},
+{"flash_display_config", "Displays current runtime config (RAM).", NULL, display_config_cmd, NULL, NULL, NULL},
+{"flash_save_config", "Saves current runtime config to flash memory.", NULL, save_flash_cmd, NULL, NULL, NULL},
+{"flash_edit_config", "Sets the provided field in runtime config to provided value.", NULL, edit_flash_cmd, NULL, NULL, NULL},
+{"flash_restore_config", "Restores all default values and saves them into runtime config.\nUse `flash_save_config` to save the runtime config to flash memory.", NULL, restore_defaults, NULL, NULL, NULL},
+{"flash_erase", "Erases flash memory partition that is holding config data.\nTo erase stored data you need to type `erase_flash Y` to ensure that flash won't be erased by accident.\nThere is no need to run `save_flash` after this function finishes.", NULL, erase_flash, NULL, NULL, NULL}
 
 };
 

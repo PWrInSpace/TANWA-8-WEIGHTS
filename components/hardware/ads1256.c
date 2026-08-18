@@ -840,12 +840,7 @@ bool ads1256_tare_channel(ads1256_device_t device, uint8_t channel)
         return false;
     }
 
-    if (flash_commit() != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to commit nvs");
-        return false;
-    }
-
-    ESP_LOGI(TAG, "Tare channel %d complete, new zero_offset=%d", channel, (int)new_zero);
+    ESP_LOGI(TAG, "Tare channel %d complete, new zero_offset=%d. Remember to use `flash_save_config` to save your changes\n", channel, (int)new_zero);
     return true;
 }
 
@@ -890,12 +885,7 @@ bool ads1256_tare_all(ads1256_device_t device){
         return false;
     }
 
-    if(flash_commit()!=ESP_OK){
-        ESP_LOGE(TAG,"Failed to commit nvs");
-        return false;
-    }
-
-    ESP_LOGI(TAG, "Tare complete");
+    ESP_LOGI(TAG, "Tare complete. Remember to use `flash_save_config` to save your changes\n");
     return true;
 
 }
@@ -956,13 +946,6 @@ bool ads1256_calibrate_channel(ads1256_device_t device, uint8_t channel, float w
         return false;
     }
 
-    if(flash_commit()!=ESP_OK){
-        ESP_LOGE(TAG,"Failed to commit NVS");
-        return false;
-    }
-
-    ESP_LOGI(TAG, "Calibration complted: channel %d, factor %.6f", channel, new_factor);
+    ESP_LOGI(TAG, "Calibration complted: channel %d, factor %.6f. Remember to use `flash_save_config` to save your changes\n", channel, new_factor);
     return true;
-
-
 }

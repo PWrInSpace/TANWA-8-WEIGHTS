@@ -1,3 +1,5 @@
+// Copyright 2026 PWrInSpace, Mateusz Kluczka
+
 #ifndef PWRINSPACE_FLASH_H
 #define PWRINSPACE_FLASH_H
 

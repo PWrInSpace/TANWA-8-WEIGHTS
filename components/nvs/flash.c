@@ -1,3 +1,5 @@
+// Copyright 2026 PWrInSpace, Mateusz Kluczka
+
 #include "flash.h"
 
 // create runtime_config
@@ -5,6 +7,7 @@ static data_config_t runtime_config = {0};
 
 static const char *TAG = "FLASH";
 static SemaphoreHandle_t runtime_mutex = NULL;
+
 esp_err_t flash_init(void) {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
