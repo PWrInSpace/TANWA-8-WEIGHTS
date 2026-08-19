@@ -47,6 +47,7 @@ bool ads1256_set_zero_offset(ads1256_wrapper_t* w, int32_t zero_offset, uint8_t 
 
 bool ads1256_tare(ads1256_wrapper_t* w);
 bool ads1256_tare_all(ads1256_wrapper_t* w);
+bool ads1256_tare_channel(ads1256_wrapper_t* w, uint8_t channel);
 bool ads1256_calibrate_channel(ads1256_wrapper_t* w, uint8_t channel, float weight);
 
 bool ads1256_get_data_struct_copy(ads1256_wrapper_t* w, ads1256_data_t* data);

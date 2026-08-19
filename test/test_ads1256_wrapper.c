@@ -180,6 +180,39 @@ void test_wrapper_tare_all(void) {
 }
 
 /* =========================================================================
+ * 6b. Test tare_channel
+ * ========================================================================= */
+
+void test_wrapper_tare_channel(void) {
+    ads1256_calibration_t cal[4] = {
+        {100, 2.0f}, // zero=100, factor=2.0
+        {50, 1.0f},  // zero=50, factor=1.0
+        {0, 1.0f},
+        {0, 1.0f}
+    };
+    ads1256_load_calibration(s_wrapper, cal);
+
+    ads1256_data_t samples[1] = {
+        {{10.0f, 20.0f, 0.0f, 0.0f}}
+    };
+    ads1256_update_data_struct(s_wrapper, samples, 1);
+
+    // Invalid channel validation
+    TEST_ASSERT_FALSE(ads1256_tare_channel(s_wrapper, 4));
+
+    // Tare channel 1 only
+    TEST_ASSERT_TRUE(ads1256_tare_channel(s_wrapper, 1));
+
+    ads1256_calibration_t cal_out[4];
+    ads1256_get_calibration(s_wrapper, cal_out);
+
+    // Channel 0 remains unchanged: 100
+    // Channel 1 updated: (20 * 1.0) + 50 = 70
+    TEST_ASSERT_EQUAL_INT32(100, cal_out[0].zero_offset);
+    TEST_ASSERT_EQUAL_INT32(70, cal_out[1].zero_offset);
+}
+
+/* =========================================================================
  * 7. Test calibrate_channel
  * ========================================================================= */
 
@@ -236,6 +269,7 @@ int main(void) {
     RUN_TEST(test_wrapper_set_zero_offset);
     RUN_TEST(test_wrapper_update_data_struct_median_filter);
     RUN_TEST(test_wrapper_tare_all);
+    RUN_TEST(test_wrapper_tare_channel);
     RUN_TEST(test_wrapper_calibrate_channel);
     RUN_TEST(test_wrapper_change_channel);
 

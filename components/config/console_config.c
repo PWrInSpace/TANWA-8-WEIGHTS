@@ -52,21 +52,45 @@ int reset_device(int argc, char **argv) {
 }
 
 int tare_cmd(int argc, char **argv) {
-    if (argc != 2) {
-        ESP_LOGE(TAG, "Usage: tare [dev_num]");
-        return 0;
+    int device = 1;
+    int channel = -1;
+
+    if (argc == 2) {
+        int arg_val = atoi(argv[1]);
+        if (arg_val >= 0 && arg_val <= 3) {
+            device = 1;
+            channel = arg_val;
+        } else {
+            device = arg_val;
+        }
+    } else if (argc >= 3) {
+        device = atoi(argv[1]);
+        channel = atoi(argv[2]);
     }
 
-    int device = atoi(argv[1]);
     ads1256_wrapper_t* w = board_get_ads1256(device);
     if (w == NULL) {
         ESP_LOGE(TAG, "Device %d not found", device);
         return 0;
     }
 
-    if (!ads1256_tare_all(w)) {
-        ESP_LOGE(TAG, "Tare failed");
-        return 0;
+    if (channel == -1) {
+        if (!ads1256_tare_all(w)) {
+            ESP_LOGE(TAG, "Tare all failed");
+            return 0;
+        }
+        ESP_LOGI(TAG, "Tare all channels complete for device %d", device);
+    } else {
+        if (channel < 0 || channel > 3) {
+            ESP_LOGE(TAG, "Channel must be in range 0...3");
+            return 0;
+        }
+
+        if (!ads1256_tare_channel(w, (uint8_t)channel)) {
+            ESP_LOGE(TAG, "Tare channel %d failed", channel);
+            return 0;
+        }
+        ESP_LOGI(TAG, "Tare channel %d complete for device %d", channel, device);
     }
 
     {
@@ -84,7 +108,50 @@ int tare_cmd(int argc, char **argv) {
         }
     }
 
-    ESP_LOGI(TAG, "Tare OK. Use save_flash to persist.");
+    ESP_LOGI(TAG, "Tare OK. Use flash_save_config to persist.");
+    return 0;
+}
+
+int edit_flash_cmd(int argc, char **argv) {
+    if (argc != 3) {
+        ESP_LOGE(TAG, "Usage: flash_edit_config <key> <value>");
+        return 0;
+    }
+
+    if (flash_edit_field(argv[1], argv[2]) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to edit field %s", argv[1]);
+        return 0;
+    }
+
+    ESP_LOGI(TAG, "Field %s updated in RAM config", argv[1]);
+    return 0;
+}
+
+int restore_defaults_cmd(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    if (flash_restore_defaults() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to restore default config");
+        return 0;
+    }
+
+    ESP_LOGI(TAG, "Default config restored to RAM");
+    return 0;
+}
+
+int erase_flash_cmd(int argc, char **argv) {
+    if (argc != 2 || strcmp(argv[1], "Y") != 0) {
+        ESP_LOGE(TAG, "Usage: flash_erase Y (confirmation required)");
+        return 0;
+    }
+
+    if (flash_erase_config() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to erase flash config");
+        return 0;
+    }
+
+    ESP_LOGI(TAG, "Flash config erased");
     return 0;
 }
 
@@ -679,11 +746,14 @@ static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
         { {"ads_start_task",         "Start ADS1256 task. Usage: ads_start_task [dev_num]",                              NULL, start_task,            NULL, NULL, NULL}, NULL },
         { {"ads_delete_task",        "Delete ADS1256 task. Usage: ads_delete_task [dev_num]",                            NULL, delete_task,           NULL, NULL, NULL}, NULL },
         { {"ads_read_id",            "Read ID from ADS1256 device. Usage: ads_read_id [dev_num]",                        NULL, read_id,               NULL, NULL, NULL}, NULL },
-        { {"ads_tare",               "Zero all sensors. Usage: ads_tare [dev_num]",                                      NULL, tare_cmd,              NULL, NULL, NULL}, NULL },
+        { {"ads_tare",               "Zero sensors. Usage: ads_tare [dev_num] [channel 0-3]",                           NULL, tare_cmd,              NULL, NULL, NULL}, NULL },
         { {"ads_calibrate_channel",  "Calibrate one channel. Usage: ads_calibrate_channel [dev_num] <channel> <weight>", NULL, calibrate_cmd,         NULL, NULL, NULL}, NULL },
-        { {"read_flash",             "Reads and displays saved data in flash memory.",                                   NULL, read_flash_cmd,        NULL, NULL, NULL}, NULL },
-        { {"display_config",         "Displays current runtime config (RAM).",                                           NULL, display_config_cmd,    NULL, NULL, NULL}, NULL },
-        { {"save_flash",             "Saves current runtime config to flash memory.",                                    NULL, save_flash_cmd,        NULL, NULL, NULL}, NULL },
+        { {"flash_read",             "Reads and displays saved data in flash memory.",                                   NULL, read_flash_cmd,        NULL, NULL, NULL}, NULL },
+        { {"flash_display_config",   "Displays current runtime config (RAM).",                                           NULL, display_config_cmd,    NULL, NULL, NULL}, NULL },
+        { {"flash_save_config",      "Saves current runtime config to flash memory.",                                    NULL, save_flash_cmd,        NULL, NULL, NULL}, NULL },
+        { {"flash_edit_config",      "Edit a field in RAM config. Usage: flash_edit_config <key> <value>",              NULL, edit_flash_cmd,        NULL, NULL, NULL}, NULL },
+        { {"flash_restore_config",   "Restore RAM config to defaults.",                                                  NULL, restore_defaults_cmd,  NULL, NULL, NULL}, NULL },
+        { {"flash_erase",            "Erase NVS flash config. Usage: flash_erase Y",                                     NULL, erase_flash_cmd,       NULL, NULL, NULL}, NULL },
     };
 
     *cmd_count = sizeof(cmd) / sizeof(cmd[0]);

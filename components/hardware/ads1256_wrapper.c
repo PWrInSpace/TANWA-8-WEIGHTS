@@ -392,7 +392,28 @@ bool ads1256_tare_all(ads1256_wrapper_t* w){
         int32_t new_zero = (int32_t)(data.weight[ch]*factor) + zero;
         w->channels[ch].zero_offset = new_zero;
     }
-    ESP_LOGI(TAG, "Tare complete");
+    ESP_LOGI(TAG, "Tare complete. Remember to use flash_save_config to save your changes.");
+    return true;
+}
+
+bool ads1256_tare_channel(ads1256_wrapper_t* w, uint8_t channel) {
+    if (w == NULL || channel > 3) {
+        ESP_LOGE(TAG, "Invalid channel number: %d", channel);
+        return false;
+    }
+
+    ads1256_data_t data;
+    if (!ads1256_get_data_struct_copy(w, &data)) {
+        ESP_LOGE(TAG, "Failed to read data for tare");
+        return false;
+    }
+
+    float factor = w->channels[channel].factor;
+    int32_t zero = w->channels[channel].zero_offset;
+    int32_t new_zero = (int32_t)(data.weight[channel] * factor) + zero;
+    w->channels[channel].zero_offset = new_zero;
+
+    ESP_LOGI(TAG, "Tare channel %d complete, new zero_offset=%ld. Remember to use flash_save_config to save your changes.", channel, (long)new_zero);
     return true;
 }
 

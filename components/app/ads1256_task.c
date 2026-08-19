@@ -152,8 +152,10 @@ bool ads1256_start_readc(ads1256_wrapper_t* w)
         if (!ads1256_stop_task_and_wait(w, pdMS_TO_TICKS(2000))) {
             ESP_LOGE("ADS1256", "Failed to stop existing task");
             return false;
+        }
     }
-}
+
+    delete_weight_sd_task();
 
     ads1256_task_args_t* args = malloc(sizeof(*args));
     if (args == NULL) {
@@ -163,8 +165,10 @@ bool ads1256_start_readc(ads1256_wrapper_t* w)
 
     args->w = w;
 
-    if (!ads1256_send_command(
-            ads1256_wrapper_get_dev(w), RDATAC_COMMAND)) {
+    ads1256_change_channel(w, 0);
+    ads1256_send_command(ads1256_wrapper_get_dev(w), SYNC_COMMAND);
+    ads1256_send_command(ads1256_wrapper_get_dev(w), WAKEUP_COMMAND);
+    if (!ads1256_send_command(ads1256_wrapper_get_dev(w), RDATAC_COMMAND)) {
         ESP_LOGE("ADS1256", "Failed to enable continuous mode");
         free(args);
         return false;

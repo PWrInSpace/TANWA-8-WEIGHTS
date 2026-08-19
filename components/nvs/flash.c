@@ -1,3 +1,5 @@
+// Copyright 2026 PWrInSpace, Mateusz Kluczka
+
 #include "flash.h"
 
 // create runtime_config
