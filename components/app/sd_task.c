@@ -197,7 +197,7 @@ void save_buffer(const char* path, readc_frame_t *buffer, size_t length) {
 void save_weight_task(void *arg)
 {
     char file_path[64];
-    get_next_filename(file_path, sizeof(file_path), "ads1_wt", "txt");
+    get_next_filename(file_path, sizeof(file_path), "wt", "txt");
     ESP_LOGI(TAG, "Saving weight data to %s", file_path);
 
     save_header_as_text(file_path, "Weight Data\n");
@@ -246,7 +246,7 @@ void delete_weight_sd_task()
 void save_ads1256_buffor_task(void *arg)
 {
     char file_path[64];
-    get_next_filename(file_path, sizeof(file_path), "ads1_log", "bin");
+    get_next_filename(file_path, sizeof(file_path), "rc", "bin");
     ESP_LOGI(TAG, "Saving ADS1256 buffer to %s", file_path);
     
     ESP_LOGI(TAG, "Starting SD card save task");
@@ -258,7 +258,7 @@ void save_ads1256_buffor_task(void *arg)
         if(new_filename_flag)
         {
             new_filename_flag = false;
-            get_next_filename(file_path, sizeof(file_path), "ads1_log", "bin");
+            get_next_filename(file_path, sizeof(file_path), "rc", "bin");
             ESP_LOGI(TAG, "New filename set: %s", file_path);
         }
         
