@@ -29,6 +29,7 @@
 static int          g_cmd_count = 0;
 static console_cmd_ex_t *g_cmd_list = NULL;
 static TaskHandle_t pw_task_handle = NULL;
+static volatile bool pw_stop_flag = false;
 
 /* HELP FUNCs*/
 
@@ -669,23 +670,23 @@ int pw_cmd(int argc, char **argv) {
     (void)argc;
     (void)argv;
 
-    ads1256_wrapper_t* w = board_get_ads1256(1);
-    if (w == NULL) {
-        ESP_LOGE(TAG, "Device 1 not found");
-        return 0;
-    }
-
-    ads1256_print_data(w);
-    return 0;
+    char* cmd[] = {"pw", "1"};
+    return print_data(2, cmd);
 }
 
 static void pw_periodic_task(void *arg) {
     ads1256_wrapper_t* w = (ads1256_wrapper_t*)arg;
+    pw_stop_flag = false;
 
-    while (1) {
+    while (!pw_stop_flag) {
         ads1256_print_data(w);
+        printf("---------------------------------------------------\n");
         vTaskDelay(pdMS_TO_TICKS(500));
     }
+
+    pw_task_handle = NULL;
+    ESP_LOGI(TAG, "Periodic weight printing stopped");
+    vTaskDelete(NULL);
 }
 
 int start_pw_cmd(int argc, char **argv) {
@@ -721,10 +722,7 @@ int stop_pw_cmd(int argc, char **argv) {
         return 0;
     }
 
-    vTaskDelete(pw_task_handle);
-    pw_task_handle = NULL;
-
-    ESP_LOGI(TAG, "Periodic weight printing stopped");
+    pw_stop_flag = true;
     return 0;
 }
 
