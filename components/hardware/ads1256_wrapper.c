@@ -537,8 +537,8 @@ void ads1256_print_data(ads1256_wrapper_t* w)
         return;
     }
 
-    ESP_LOGI(TAG, "Weight Channel 0: %.2f", data.weight[0]);
-    ESP_LOGI(TAG, "Weight Channel 1: %.2f", data.weight[1]);
+    ESP_LOGI(TAG, "Weight Channel 0 (HAMOWNIA): %.2f", data.weight[0]);
+    ESP_LOGI(TAG, "Weight Channel 1 (BUTLA-MATKA): %.2f", data.weight[1]);
     ESP_LOGI(TAG, "Weight Channel 2: %.2f", data.weight[2]);
     ESP_LOGI(TAG, "Weight Channel 3: %.2f", data.weight[3]);
 }

@@ -681,7 +681,7 @@ static void pw_periodic_task(void *arg) {
     while (!pw_stop_flag) {
         ads1256_print_data(w);
         printf("---------------------------------------------------\n");
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
     pw_task_handle = NULL;
