@@ -694,7 +694,8 @@ int start_pw_cmd(int argc, char **argv) {
     (void)argv;
 
     if (pw_task_handle != NULL) {
-        ESP_LOGW(TAG, "pw task is already running, use stop_pw first");
+        pw_stop_flag = true;
+        ESP_LOGI(TAG, "Stopping periodic weight printing...");
         return 0;
     }
 
@@ -709,20 +710,7 @@ int start_pw_cmd(int argc, char **argv) {
         return 0;
     }
 
-    ESP_LOGI(TAG, "Periodic weight printing started (every 0.5s)");
-    return 0;
-}
-
-int stop_pw_cmd(int argc, char **argv) {
-    (void)argc;
-    (void)argv;
-
-    if (pw_task_handle == NULL) {
-        ESP_LOGW(TAG, "pw task is not running");
-        return 0;
-    }
-
-    pw_stop_flag = true;
+    ESP_LOGI(TAG, "Periodic weight printing started (every 0.5s). Type 'start_pw' again to stop.");
     return 0;
 }
 
@@ -817,8 +805,7 @@ static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
         { {"flash_restore_config",   "Restore RAM config to defaults.",                                                  NULL, restore_defaults_cmd,  NULL, NULL, NULL}, NULL },
         { {"flash_erase",            "Erase NVS flash config. Usage: flash_erase Y",                                     NULL, erase_flash_cmd,       NULL, NULL, NULL}, NULL },
         { {"pw",                    "Print weights from device 1.",                                                      NULL, pw_cmd,                NULL, NULL, NULL}, NULL },
-        { {"start_pw",              "Start periodic weight printing (every 0.5s).",                                      NULL, start_pw_cmd,          NULL, NULL, NULL}, NULL },
-        { {"stop_pw",               "Stop periodic weight printing.",                                                    NULL, stop_pw_cmd,           NULL, NULL, NULL}, NULL },
+        { {"start_pw",              "Toggle periodic weight printing (every 0.5s).",                                     NULL, start_pw_cmd,          NULL, NULL, NULL}, NULL },
     };
 
     *cmd_count = sizeof(cmd) / sizeof(cmd[0]);
