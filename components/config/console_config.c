@@ -28,6 +28,8 @@
 
 static int          g_cmd_count = 0;
 static console_cmd_ex_t *g_cmd_list = NULL;
+static TaskHandle_t pw_task_handle = NULL;
+static volatile bool pw_stop_flag = false;
 
 /* HELP FUNCs*/
 
@@ -664,6 +666,54 @@ int print_data(int argc, char **argv) {
     return 0;
 }
 
+int pw_cmd(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    char* cmd[] = {"pw", "1"};
+    return print_data(2, cmd);
+}
+
+static void pw_periodic_task(void *arg) {
+    ads1256_wrapper_t* w = (ads1256_wrapper_t*)arg;
+    pw_stop_flag = false;
+
+    while (!pw_stop_flag) {
+        ads1256_print_data(w);
+        printf("---------------------------------------------------\n");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
+    pw_task_handle = NULL;
+    ESP_LOGI(TAG, "Periodic weight printing stopped");
+    vTaskDelete(NULL);
+}
+
+int start_pw_cmd(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    if (pw_task_handle != NULL) {
+        pw_stop_flag = true;
+        ESP_LOGI(TAG, "Stopping periodic weight printing...");
+        return 0;
+    }
+
+    ads1256_wrapper_t* w = board_get_ads1256(1);
+    if (w == NULL) {
+        ESP_LOGE(TAG, "Device 1 not found");
+        return 0;
+    }
+
+    if (xTaskCreate(pw_periodic_task, "pw_task", 4096, w, 5, &pw_task_handle) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create pw task");
+        return 0;
+    }
+
+    ESP_LOGI(TAG, "Periodic weight printing started (every 0.5s). Type 'start_pw' again to stop.");
+    return 0;
+}
+
 int stop_task(int argc, char **argv) {
     if(argc != 2) {
         ESP_LOGE(TAG, "Usage: command [dev_num]");
@@ -754,6 +804,8 @@ static esp_err_t setup_commands(int *cmd_count, console_cmd_ex_t **cmd_list) {
         { {"flash_edit_config",      "Edit a field in RAM config. Usage: flash_edit_config <key> <value>",              NULL, edit_flash_cmd,        NULL, NULL, NULL}, NULL },
         { {"flash_restore_config",   "Restore RAM config to defaults.",                                                  NULL, restore_defaults_cmd,  NULL, NULL, NULL}, NULL },
         { {"flash_erase",            "Erase NVS flash config. Usage: flash_erase Y",                                     NULL, erase_flash_cmd,       NULL, NULL, NULL}, NULL },
+        { {"pw",                    "Print weights from device 1.",                                                      NULL, pw_cmd,                NULL, NULL, NULL}, NULL },
+        { {"start_pw",              "Toggle periodic weight printing (every 0.5s).",                                     NULL, start_pw_cmd,          NULL, NULL, NULL}, NULL },
     };
 
     *cmd_count = sizeof(cmd) / sizeof(cmd[0]);
